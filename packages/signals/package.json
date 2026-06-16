@@ -11,7 +11,7 @@
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint src",
     "test": "pnpm build && node --test test/signals.test.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "pnpm -C ../.. --filter @tradescribe/metrics build && tsc --noEmit"
   },
   "dependencies": {
     "@tradescribe/metrics": "workspace:*"

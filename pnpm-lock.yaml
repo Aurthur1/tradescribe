@@ -167,6 +167,9 @@ importers:
 
   packages/ai:
     dependencies:
+      '@tradescribe/metrics':
+        specifier: workspace:*
+        version: link:../metrics
       zod:
         specifier: ^3.24.1
         version: 3.25.76

@@ -5,6 +5,9 @@ import { getPrismaClient } from "@tradescribe/db";
 import { runJournalGenerateJob, runWeeklyReviewJob } from "./ai-jobs.js";
 import { runConnectionBackfillJob, runConnectionSyncJob } from "./connection-jobs.js";
 import { runGuardrailCheckJob, runLeaksDetectJob } from "./signals-jobs.js";
+import { validateWorkerEnv } from "./validate-env.js";
+
+validateWorkerEnv();
 
 const redisUrl = new URL(process.env.REDIS_URL ?? "redis://localhost:6379");
 const connection: ConnectionOptions = {

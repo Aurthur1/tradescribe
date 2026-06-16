@@ -5,10 +5,8 @@
     "moduleResolution": "NodeNext",
     "noEmit": true,
     "outDir": "dist",
-    "paths": {
-      "@tradescribe/metrics": ["packages/metrics/dist/index.d.ts"]
-    },
     "rootDir": "src"
   },
+  "references": [{ "path": "../metrics" }],
   "include": ["src/**/*.ts"]
 }

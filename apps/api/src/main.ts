@@ -5,9 +5,11 @@ import type { NestExpressApplication } from "@nestjs/platform-express";
 import helmet from "helmet";
 import { AppModule } from "./app.module.js";
 import { createRateLimitMiddleware } from "./common/rate-limit.middleware.js";
+import { validateEnv } from "./common/validate-env.js";
 import { ZodValidationPipe } from "./zod-validation.pipe.js";
 
 async function bootstrap() {
+  validateEnv();
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
   app.useBodyParser("json", { limit: process.env.JSON_BODY_LIMIT ?? "1mb" });
   app.use(
