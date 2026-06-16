@@ -89,7 +89,7 @@ function summaryFromJournal(observed: string, inferred: string) {
   return `Observed: ${observed}\n\nInferred: ${inferred}`;
 }
 
-function startOfPreviousWeek(now: Date, timeZone = "UTC") {
+function startOfPreviousWeek(now: Date, _timeZone = "UTC") {
   // Period boundaries are UTC approximations for now; display timezone is carried into metrics bucketing.
   const current = new Date(now);
   current.setUTCHours(0, 0, 0, 0);
