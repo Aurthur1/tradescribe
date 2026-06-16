@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "noUncheckedIndexedAccess": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@tradescribe/ai": ["packages/ai/src/index.ts"],
+      "@tradescribe/billing": ["packages/billing/src/index.ts"],
+      "@tradescribe/db": ["packages/db/src/index.ts"],
+      "@tradescribe/metaapi": ["packages/metaapi/src/index.ts"],
+      "@tradescribe/metrics": ["packages/metrics/src/index.ts"],
+      "@tradescribe/signals": ["packages/signals/src/index.ts"],
+      "@tradescribe/shared": ["packages/shared/src/index.ts"]
+    }
+  }
+}

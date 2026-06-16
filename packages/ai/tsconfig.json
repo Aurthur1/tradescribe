@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": true,
+    "outDir": "dist",
+    "paths": {
+      "@tradescribe/metrics": ["packages/metrics/dist/index.d.ts"]
+    },
+    "rootDir": "src"
+  },
+  "include": ["src/**/*.ts"]
+}

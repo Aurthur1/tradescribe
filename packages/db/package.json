@@ -1,0 +1,25 @@
+{
+  "name": "@tradescribe/db",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "generate": "PRISMA_ENGINES_CACHE_DIR=../../node_modules/.cache/prisma prisma generate --schema prisma/schema.prisma",
+    "lint": "eslint src",
+    "migrate": "PRISMA_ENGINES_CACHE_DIR=../../node_modules/.cache/prisma prisma migrate dev --schema prisma/schema.prisma",
+    "test": "echo \"db tests not yet implemented\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.3"
+  },
+  "devDependencies": {
+    "prisma": "^6.19.3",
+    "typescript": "^5.7.2"
+  }
+}

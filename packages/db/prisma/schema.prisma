@@ -1,0 +1,381 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum SubscriptionPlan {
+  FREE
+  CORE
+  PRO
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+}
+
+enum BillingProvider {
+  STRIPE
+  PAYSTACK
+}
+
+enum ConnectionStatus {
+  PENDING
+  PROVISIONING
+  SYNCING
+  CONNECTED
+  DEGRADED
+  DISCONNECTED
+}
+
+enum TradeSide {
+  BUY
+  SELL
+}
+
+enum TradingPlatform {
+  MT4
+  MT5
+}
+
+enum TradingSession {
+  Sydney
+  Tokyo
+  London
+  New_York
+}
+
+model User {
+  id                String             @id @default(cuid())
+  authProviderId    String             @unique
+  email             String             @unique
+  firstName         String?
+  lastName          String?
+  avatarUrl         String?
+  role              UserRole           @default(USER)
+  plan              SubscriptionPlan   @default(FREE)
+  status            String             @default("active")
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  alerts            Alert[]
+  brokerConnections BrokerConnection[]
+  coachProfile      CoachProfile?
+  dashboardLayout    DashboardLayout?
+  preferences       UserPreference?
+  adviceLogs        AdviceLog[]
+  playbooks         Playbook[]
+  subscriptions     Subscription[]
+  weeklyReviews     WeeklyReview[]
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  actorUserId  String
+  action       String
+  targetUserId String?
+  targetType   String?
+  targetId     String?
+  metadata     Json?
+  ip           String?
+  createdAt    DateTime @default(now())
+
+  @@index([actorUserId, createdAt])
+  @@index([targetUserId, createdAt])
+}
+
+model UserPreference {
+  id                       String    @id @default(cuid())
+  userId                   String    @unique
+  user                     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeAccountId          String?
+  onboardingCompletedAt    DateTime?
+  onboardingSampleModeAt   DateTime?
+  notificationPreferences  Json?
+  displayCurrencyAccountId String?
+  timeZone                 String?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+}
+
+model Playbook {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  rules       Json
+  tags        String[]
+  color       String   @default("#3B82F6")
+  isArchived  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  trades      Trade[]
+
+  @@index([userId])
+}
+
+model DashboardLayout {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  layout    Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model WeeklyReview {
+  id               String          @id @default(cuid())
+  userId           String
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tradingAccountId String?
+  tradingAccount   TradingAccount? @relation(fields: [tradingAccountId], references: [id], onDelete: SetNull)
+  periodStart      DateTime
+  periodEnd        DateTime
+  report           Json?
+  summary          String
+  strengths        Json
+  leaks            Json
+  actions          Json
+  model            String?
+  tokensUsed       Int             @default(0)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@unique([tradingAccountId, periodStart])
+  @@index([userId, periodStart])
+  @@index([userId, createdAt])
+  @@index([tradingAccountId, periodStart])
+}
+
+model CoachProfile {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goals              Json
+  recurringLeaks     Json
+  riskProfileSummary String
+  riskProfile        Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model AdviceLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  text      String
+  status    String   @default("pending")
+  weekStart DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt])
+}
+
+model Subscription {
+  id                 String             @id @default(cuid())
+  userId             String
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan               SubscriptionPlan
+  status             SubscriptionStatus
+  provider           BillingProvider
+  providerCustomerId String?
+  providerSubId      String?            @unique
+  currency           String             @default("USD")
+  amountCents        Int                @default(0)
+  currentPeriodEnd   DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@index([userId, status])
+  @@index([provider, status])
+}
+
+model BrokerConnection {
+  id               String           @id @default(cuid())
+  userId           String
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider         String           @default("metaapi")
+  platform         TradingPlatform?
+  broker           String?
+  server           String?
+  login            String?
+  metaApiAccountId String?          @unique
+  status           ConnectionStatus @default(PENDING)
+  lastError        String?
+  lastSyncAt       DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  tradingAccounts  TradingAccount[]
+
+  @@index([userId, status])
+}
+
+model TradingAccount {
+  id                 String           @id @default(cuid())
+  brokerConnectionId String
+  brokerConnection   BrokerConnection @relation(fields: [brokerConnectionId], references: [id], onDelete: Cascade)
+  platform           TradingPlatform
+  login              String
+  name               String?
+  label              String?
+  currency           String           @default("USD")
+  startingBalance    Float            @default(0)
+  accountType        String           @default("LIVE")
+  propFirm           String?
+  isPrimary          Boolean          @default(false)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  trades             Trade[]
+  equitySnapshots    EquitySnapshot[]
+  leakFlags          LeakFlag[]
+  propFirmRuleSet    PropFirmRuleSet?
+  weeklyReviews      WeeklyReview[]
+
+  @@index([brokerConnectionId])
+  @@index([login])
+}
+
+model Trade {
+  id               String          @id @default(cuid())
+  tradingAccountId String
+  tradingAccount   TradingAccount  @relation(fields: [tradingAccountId], references: [id], onDelete: Cascade)
+  externalId        String
+  symbol            String
+  side              TradeSide
+  openTime          DateTime
+  closeTime         DateTime
+  openPrice         Float
+  closePrice        Float
+  volume            Float
+  grossProfit       Float
+  commission        Float           @default(0)
+  swap              Float           @default(0)
+  stopLoss          Float?
+  takeProfit        Float?
+  brokerTimeZone    String?
+  playbookId        String?
+  playbook          Playbook?       @relation(fields: [playbookId], references: [id], onDelete: SetNull)
+  riskAmount        Float?
+  rMultiple         Float?
+  durationSec       Int?
+  session           TradingSession?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  notes             TradeNote[]
+  journalEntry      JournalEntry?
+  screenshots       TradeScreenshot[]
+
+  @@unique([tradingAccountId, externalId])
+  @@index([tradingAccountId, closeTime])
+  @@index([playbookId])
+  @@index([symbol])
+}
+
+model PropFirmRuleSet {
+  id                            String         @id @default(cuid())
+  tradingAccountId              String         @unique
+  tradingAccount                TradingAccount @relation(fields: [tradingAccountId], references: [id], onDelete: Cascade)
+  maxDailyLossPct               Float?
+  maxDailyLossMode              String         @default("balance")
+  maxDrawdownPct                Float?
+  maxDrawdownMode               String         @default("static")
+  profitTargetPct               Float?
+  consistencyMaxDailyProfitPct  Float?
+  alertThresholdPct             Float          @default(0.8)
+  updatedAt                     DateTime       @updatedAt
+}
+
+model LeakFlag {
+  id               String         @id @default(cuid())
+  tradingAccountId String
+  tradingAccount   TradingAccount @relation(fields: [tradingAccountId], references: [id], onDelete: Cascade)
+  type             String
+  severity         String
+  tradeIds         String[]
+  periodStart      DateTime?
+  periodEnd        DateTime?
+  evidence         Json
+  status           String         @default("active")
+  createdAt        DateTime       @default(now())
+
+  @@index([tradingAccountId, type, createdAt])
+}
+
+model Alert {
+  id               String    @id @default(cuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tradingAccountId String?
+  type             String
+  severity         String
+  payload          Json
+  channel          String    @default("in_app")
+  readAt           DateTime?
+  sentAt           DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model EquitySnapshot {
+  id               String         @id @default(cuid())
+  tradingAccountId String
+  tradingAccount   TradingAccount @relation(fields: [tradingAccountId], references: [id], onDelete: Cascade)
+  ts               DateTime
+  equity           Float
+  balance          Float
+
+  @@unique([tradingAccountId, ts])
+  @@index([tradingAccountId, ts])
+}
+
+model TradeNote {
+  id        String   @id @default(cuid())
+  tradeId   String
+  trade     Trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  body      String
+  emotion   String?
+  emotionTags String[] @default([])
+  playbookChecklist Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model JournalEntry {
+  id        String   @id @default(cuid())
+  tradeId   String   @unique
+  trade     Trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  observed  String?
+  inferred  String?
+  summary   String
+  model     String?
+  tokensUsed Int     @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TradeScreenshot {
+  id         String   @id @default(cuid())
+  tradeId    String
+  trade      Trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  url        String
+  storageKey String?
+  filename   String?
+  mimeType   String?
+  createdAt  DateTime @default(now())
+
+  @@index([tradeId, createdAt])
+}
