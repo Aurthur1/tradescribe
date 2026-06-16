@@ -1,4 +1,4 @@
-import type { ZodSchema } from "zod";
+import type { ZodType, ZodTypeDef } from "zod";
 
 export type LLMProviderName = "anthropic" | "openai";
 export type LLMRole = "user" | "assistant";
@@ -11,7 +11,7 @@ export interface LLMMessage {
 export interface GenerateStructuredInput<T> {
   system: string;
   messages: LLMMessage[];
-  schema: ZodSchema<T>;
+  schema: ZodType<T, ZodTypeDef, unknown>;
   maxTokens: number;
 }
 

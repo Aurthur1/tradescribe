@@ -1,11 +1,33 @@
 import { z } from "zod";
 
-export const JournalEntrySchema = z.object({
+export interface JournalEntryOutput {
+  observed: string;
+  inferred: string;
+}
+
+export interface WeeklyReviewOutput {
+  summary: string;
+  strengths: string[];
+  prioritizedLeaks: Array<{
+    type: string;
+    severity: "info" | "warning" | "critical";
+    explanation: string;
+    evidenceTradeIds: string[];
+  }>;
+  nextActions: string[];
+  coachProfileDelta: {
+    newRecurringLeaks: string[];
+    resolvedLeaks: string[];
+    adviceGiven: string[];
+  };
+}
+
+export const JournalEntrySchema: z.ZodType<JournalEntryOutput, z.ZodTypeDef, unknown> = z.object({
   observed: z.string().min(1),
   inferred: z.string().min(1)
 });
 
-export const WeeklyReviewSchema = z.object({
+export const WeeklyReviewSchema: z.ZodType<WeeklyReviewOutput, z.ZodTypeDef, unknown> = z.object({
   summary: z.string().min(1),
   strengths: z.array(z.string().min(1)).max(5),
   prioritizedLeaks: z
@@ -25,6 +47,3 @@ export const WeeklyReviewSchema = z.object({
     adviceGiven: z.array(z.string())
   })
 });
-
-export type JournalEntryOutput = z.infer<typeof JournalEntrySchema>;
-export type WeeklyReviewOutput = z.infer<typeof WeeklyReviewSchema>;
