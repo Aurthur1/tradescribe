@@ -159,8 +159,8 @@ export class AuthGuard implements CanActivate {
           email: "trader@example.com",
           firstName: "Trader",
           id: "dev-user",
-          plan: "FREE",
-          role: "ADMIN"
+          plan: (process.env.DEV_USER_PLAN as "FREE" | "CORE" | "PRO") ?? "FREE",
+          role: process.env.DEV_USER_ROLE === "ADMIN" ? "ADMIN" : "USER"
         };
         return true;
       }

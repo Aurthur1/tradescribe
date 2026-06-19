@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Module, Param, Post, Query, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Module, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { z, ZodError, type ZodTypeAny } from "zod";
 import { AuthGuard } from "../auth/auth.guard.js";
 import { CurrentUser } from "../auth/current-user.decorator.js";
@@ -25,9 +25,21 @@ const ScreenshotSignSchema = z.object({
   mimeType: z.string().max(120)
 });
 
+const BulkPlaybookSchema = z.object({
+  playbookId: z.string().nullable(),
+  tradeIds: z.array(z.string()).min(1).max(10000)
+});
+
+const BulkEmotionSchema = z.object({
+  emotionTag: z.string().trim().min(1).max(40),
+  tradeIds: z.array(z.string()).min(1).max(10000)
+});
+
 type TradeNoteInput = z.infer<typeof TradeNoteSchema>;
 type ScreenshotInput = z.infer<typeof ScreenshotSchema>;
 type ScreenshotSignInput = z.infer<typeof ScreenshotSignSchema>;
+type BulkPlaybookInput = z.infer<typeof BulkPlaybookSchema>;
+type BulkEmotionInput = z.infer<typeof BulkEmotionSchema>;
 
 function parseQuery<T>(schema: ZodTypeAny, query: unknown): T {
   try {
@@ -80,6 +92,16 @@ export class MetricsController {
   @Post("trades/:id/screenshots/sign")
   createScreenshotUpload(@CurrentUser("id") userId: string, @Param("id") tradeId: string, @Body() body: unknown) {
     return this.metrics.createScreenshotUpload(userId, tradeId, parseQuery<ScreenshotSignInput>(ScreenshotSignSchema, body));
+  }
+
+  @Patch("trades/bulk/playbook")
+  bulkPlaybook(@CurrentUser("id") userId: string, @Body() body: unknown) {
+    return this.metrics.bulkSetPlaybook(userId, parseQuery<BulkPlaybookInput>(BulkPlaybookSchema, body));
+  }
+
+  @Patch("trades/bulk/emotion")
+  bulkEmotion(@CurrentUser("id") userId: string, @Body() body: unknown) {
+    return this.metrics.bulkAddEmotion(userId, parseQuery<BulkEmotionInput>(BulkEmotionSchema, body));
   }
 }
 

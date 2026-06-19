@@ -5,6 +5,7 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
+        mono: ["var(--font-geist-mono)", "JetBrains Mono", "SFMono-Regular", "ui-monospace", "monospace"],
         sans: ["var(--font-geist)", "Inter", "ui-sans-serif", "system-ui", "sans-serif"]
       },
       colors: {

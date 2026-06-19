@@ -60,6 +60,7 @@ import {
 } from "../_lib/dashboard-sample";
 import { formatCurrency, formatDeltaPercent, formatNumber, formatPercent, formatProfitFactor } from "../_lib/format";
 import { AccountSwitcher } from "../_components/account-switcher";
+import { EmptyPreview } from "../_components/ui";
 import { PlaybookComparisonWidget } from "../playbooks/_components/playbook-comparison-widget";
 
 const granularities: Granularity[] = ["day", "week", "month", "year"];
@@ -660,13 +661,13 @@ function DashboardMetrics({
   }
 
   return (
-    <div className="mt-6 space-y-6">
+    <div className="mt-4 space-y-4">
       {selectedDate ? (
         <div className="inline-flex rounded-full border border-[#3B82F6]/20 bg-[#3B82F6]/10 px-3 py-1 text-xs font-bold text-[#BFDBFE]">
           Day view active
         </div>
       ) : null}
-      <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-5 sm:overflow-visible sm:px-0 sm:pb-0 xl:grid-cols-4">
+      <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0 xl:grid-cols-4">
         <KpiCard
           accent="green"
           delta={metrics.deltas?.netPnl.percent ?? null}
@@ -727,7 +728,7 @@ function DashboardMetrics({
         </div>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-12">
+      <div className="grid items-stretch gap-4 xl:grid-cols-12">
         {visibleLayout.map((item) => {
           const widget = widgets[item.widgetId];
           if (!widget) return null;
@@ -813,9 +814,9 @@ function KpiCard({
   const deltaClass = deltaNeutral ? "text-[#94A3B8]" : positive ? "text-[#22C55E]" : "text-[#EF4444]";
 
   return (
-    <article className="relative min-h-[158px] w-[282px] shrink-0 snap-start overflow-hidden rounded-2xl border border-white/[0.06] bg-[#141A2A]/70 p-6 shadow-[0_1px_2px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.04)] transition duration-150 hover:-translate-y-0.5 hover:shadow-[0_18px_50px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.04)] motion-safe:animate-[fadeUp_420ms_ease_both] sm:w-auto sm:shrink">
-      <div className="flex items-start justify-between gap-4">
-        <p className="flex items-center gap-1.5 text-sm font-semibold text-[#94A3B8]">
+    <article className="terminal-panel terminal-panel-interactive relative w-[264px] shrink-0 snap-start overflow-hidden rounded-2xl p-4 motion-safe:animate-[fadeUp_420ms_ease_both] sm:w-auto sm:shrink">
+      <div className="flex items-start justify-between gap-3">
+        <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-[#94A3B8]">
           {label}
           <span className="group/info relative inline-flex">
             <button className="rounded-full text-[#64748B] transition hover:text-[#CBD5E1] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]" type="button" aria-label={`${label} definition`}>
@@ -826,11 +827,11 @@ function KpiCard({
             </span>
           </span>
         </p>
-        <span className={`flex h-11 w-11 items-center justify-center rounded-full ${chip}`}>{icon}</span>
+        <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${chip}`}>{icon}</span>
       </div>
-      <p className={`mt-6 text-[32px] font-bold leading-none tracking-normal tabular-nums ${valueClass}`}>{value}</p>
-      <div className="mt-4 flex min-w-0 items-center justify-between gap-3 text-[13px] font-semibold text-[#94A3B8]">
-        <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+      <p className={`terminal-number mt-3 text-[28px] font-semibold leading-none tracking-normal ${valueClass}`}>{value}</p>
+      <div className="mt-3 flex min-w-0 items-center justify-between gap-2 text-[12px] font-semibold text-[#94A3B8]">
+        <p className="flex min-w-0 items-center gap-1 overflow-hidden">
           <span>{vsLabel}</span>
           <span className={`inline-flex flex-shrink-0 items-center gap-1 ${deltaClass}`} aria-label={deltaNeutral ? "directional change, not a performance judgment" : undefined}>
             <DeltaIcon className="h-3.5 w-3.5" aria-hidden />
@@ -1074,11 +1075,11 @@ function PerformanceChart({
   const chart = useMemo(() => buildChart(data, mode), [data, mode]);
 
   return (
-    <section className="rounded-2xl border border-white/[0.06] bg-[#141A2A]/70 p-6 shadow-[0_1px_2px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.04)]">
+    <section className="terminal-panel rounded-2xl p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-[18px] font-bold tracking-normal text-white">Performance</h2>
-          <p className="mt-2 text-sm font-medium text-[#94A3B8]">
+          <h2 className="text-[15px] font-bold tracking-normal text-white">Performance</h2>
+          <p className="mt-1 text-xs font-semibold text-[#94A3B8]">
             {mode === "daily" ? "Daily P&L results" : "Daily P&L and cumulative results"}
           </p>
         </div>
@@ -1114,7 +1115,7 @@ function PerformanceChart({
         </div>
       </div>
 
-      <div className="mt-6 h-[320px]">
+      <div className="mt-3 h-[260px]">
         <svg aria-label="Performance chart" className="h-full w-full overflow-visible" role="img" viewBox="0 0 720 320">
           <defs>
             <linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1">
@@ -1140,19 +1141,42 @@ function PerformanceChart({
           ))}
         </svg>
       </div>
+      <ChartStatStrip currency={currency} data={data} />
     </section>
   );
 }
 
 function EquityCurveWidget({ currency, data }: { currency: string; data: DailyPoint[] }) {
   return (
-    <section className="min-h-[260px] rounded-2xl border border-white/[0.06] bg-[#141A2A]/70 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <h2 className="text-[18px] font-bold text-white">Equity Curve</h2>
-      <p className="mt-2 text-sm font-medium text-[#94A3B8]">Reconstructed from cumulative period results.</p>
-      <div className="mt-6 h-[240px]">
+    <section className="terminal-panel rounded-2xl p-4">
+      <h2 className="text-[15px] font-bold text-white">Equity Curve</h2>
+      <p className="mt-1 text-xs font-semibold text-[#94A3B8]">Reconstructed from cumulative period results.</p>
+      <div className="mt-3 h-[220px]">
         <MiniAreaChart currency={currency} data={data} />
       </div>
+      <ChartStatStrip currency={currency} data={data} compact />
     </section>
+  );
+}
+
+function ChartStatStrip({ compact, currency, data }: { compact?: boolean; currency: string; data: DailyPoint[] }) {
+  const values = data.map((point) => point.netPnl);
+  const high = Math.max(0, ...values);
+  const low = Math.min(0, ...values);
+  const net = data.reduce((sum, point) => sum + point.netPnl, 0);
+  return (
+    <div className={`grid grid-cols-3 gap-2 border-t border-white/[0.06] ${compact ? "mt-2 pt-2" : "mt-3 pt-3"}`}>
+      {[
+        ["High", high, high >= 0 ? "text-[#34D399]" : "text-[#F87171]"],
+        ["Low", low, low >= 0 ? "text-[#34D399]" : "text-[#F87171]"],
+        ["Net", net, net >= 0 ? "text-[#34D399]" : "text-[#F87171]"]
+      ].map(([label, value, color]) => (
+        <div className="min-w-0" key={label as string}>
+          <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#64748B]">{label}</p>
+          <p className={`terminal-number mt-1 truncate text-xs font-semibold ${color}`}>{formatCurrency(value as number, currency)}</p>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -1195,26 +1219,26 @@ function WinLossDonutWidget({
   const winDash = Math.max(0, Math.min(circumference, winRate * circumference));
 
   return (
-    <section className="min-h-[260px] rounded-2xl border border-white/[0.06] bg-[#141A2A]/70 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <h2 className="text-[18px] font-bold text-white">Win/Loss Mix</h2>
-      <div className="mt-6 grid place-items-center">
-        <div className="relative h-36 w-36">
+    <section className="terminal-panel rounded-2xl p-4">
+      <h2 className="text-[15px] font-bold text-white">Win/Loss Mix</h2>
+      <div className="mt-3 grid place-items-center">
+        <div className="relative h-28 w-28">
           <svg className="h-full w-full -rotate-90" viewBox="0 0 42 42">
             <circle cx="21" cy="21" fill="none" r="15.9" stroke="rgba(148,163,184,0.18)" strokeWidth="5" />
             <circle cx="21" cy="21" fill="none" r="15.9" stroke="#22C55E" strokeDasharray={`${winDash} ${circumference - winDash}`} strokeLinecap="round" strokeWidth="5" />
           </svg>
           <div className="absolute inset-0 grid place-items-center text-center">
             <div>
-              <p className="text-2xl font-bold tabular-nums text-white">{formatPercent(winRate)}</p>
+              <p className="terminal-number text-xl font-semibold text-white">{formatPercent(winRate)}</p>
               <p className="text-xs font-semibold text-[#94A3B8]">win rate</p>
             </div>
           </div>
         </div>
       </div>
-      <div className="mt-5 grid grid-cols-3 gap-2 text-center text-xs font-semibold text-[#94A3B8]">
-        <span>Wins <strong className="block text-[#22C55E] tabular-nums">{winningTrades}</strong></span>
-        <span>Losses <strong className="block text-[#EF4444] tabular-nums">{losingTrades}</strong></span>
-        <span>BE <strong className="block text-[#CBD5E1] tabular-nums">{breakevenTrades}</strong></span>
+      <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs font-semibold text-[#94A3B8]">
+        <span>Wins <strong className="terminal-number block text-[#22C55E]">{winningTrades}</strong></span>
+        <span>Losses <strong className="terminal-number block text-[#EF4444]">{losingTrades}</strong></span>
+        <span>BE <strong className="terminal-number block text-[#CBD5E1]">{breakevenTrades}</strong></span>
       </div>
     </section>
   );
@@ -1229,9 +1253,9 @@ function SessionPerformanceWidget({
 }) {
   const max = Math.max(1, ...sessions.map((session) => Math.abs(session.netPnl)));
   return (
-    <section className="rounded-2xl border border-white/[0.06] bg-[#141A2A]/70 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <h2 className="text-[18px] font-bold text-white">Session Performance</h2>
-      <div className="mt-6 space-y-4">
+    <section className="terminal-panel rounded-2xl p-4">
+      <h2 className="text-[15px] font-bold text-white">Session Performance</h2>
+      <div className="mt-3 space-y-3">
         {sessions.map((session) => {
           const positive = session.netPnl >= 0;
           return (
@@ -1240,7 +1264,7 @@ function SessionPerformanceWidget({
                 <span className="text-[#CBD5E1]">{session.session}</span>
                 <span className={`${positive ? "text-[#22C55E]" : "text-[#EF4444]"} tabular-nums`}>{formatCurrency(session.netPnl, currency)}</span>
               </div>
-              <div className="mt-2 h-2 rounded-full bg-white/[0.05]">
+              <div className="mt-1.5 h-1.5 rounded-full bg-white/[0.05]">
                 <div className={`h-full rounded-full ${positive ? "bg-[#22C55E]" : "bg-[#EF4444]"}`} style={{ width: `${Math.max(8, (Math.abs(session.netPnl) / max) * 100)}%` }} />
               </div>
             </div>
@@ -1261,22 +1285,22 @@ function LeakSummaryWidget({ leaks }: { leaks: LeakFlagResponse[] }) {
   const top = [...active].sort((a, b) => severityRank(a.severity) - severityRank(b.severity)).slice(0, 3);
 
   return (
-    <section className="rounded-2xl border border-white/[0.06] bg-[#141A2A]/70 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <h2 className="text-[18px] font-bold text-white">Leak Summary</h2>
+    <section className="terminal-panel rounded-2xl p-4">
+      <h2 className="text-[15px] font-bold text-white">Leak Summary</h2>
       {active.length === 0 ? <p className="mt-2 text-sm font-medium text-[#94A3B8]">No active behavioral flags for this period.</p> : null}
-      <div className="mt-5 grid grid-cols-2 gap-3">
+      <div className="mt-3 grid grid-cols-2 gap-3">
         {(["critical", "warning", "info"] as const).map((severity) => (
-          <div className="min-h-[78px] rounded-xl border border-white/[0.06] bg-white/[0.03] p-3" key={severity}>
+          <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3" key={severity}>
             <p className="text-[11px] font-semibold capitalize text-[#94A3B8]">{severity}</p>
-            <p className="mt-2 text-xl font-bold text-white tabular-nums">{counts[severity]}</p>
+            <p className="terminal-number mt-1 text-xl font-semibold text-white">{counts[severity]}</p>
           </div>
         ))}
-        <div className="min-h-[78px] rounded-xl border border-white/[0.06] bg-white/[0.03] p-3" title="Not available — requires order-modification history">
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3" title="Not available — requires order-modification history">
           <p className="text-[11px] font-semibold text-[#94A3B8]">Stop widened</p>
-          <p className="mt-2 truncate text-xs font-semibold text-[#64748B]">Not available — hover for details</p>
+          <p className="mt-1 truncate text-xs font-semibold text-[#64748B]">Not available — hover for details</p>
         </div>
       </div>
-      <div className="mt-4 space-y-2">
+      <div className="mt-3 space-y-2">
         {top.map((flag) => (
           <a className="block rounded-xl border border-white/[0.06] bg-black/20 p-3 text-sm font-semibold text-[#CBD5E1] hover:bg-white/[0.04]" href={flag.tradeIds[0] ? `/trades?trade=${flag.tradeIds[0]}` : `/dashboard?day=${flag.periodStart ?? ""}`} key={flag.id}>
             <span className={`mr-2 rounded-full px-2 py-0.5 text-[10px] uppercase ${flag.severity === "critical" ? "bg-[#EF4444]/15 text-[#FCA5A5]" : "bg-[#F59E0B]/15 text-[#FCD34D]"}`}>
@@ -1293,13 +1317,13 @@ function LeakSummaryWidget({ leaks }: { leaks: LeakFlagResponse[] }) {
 function CoachNoteWidget({ isSample, locked, review }: { isSample: boolean; locked: boolean; review: WeeklyReview | null }) {
   if (locked) {
     return (
-      <section className="rounded-2xl border border-[#3B82F6]/20 bg-[#13213A]/70 p-6 shadow-[0_20px_80px_rgba(59,130,246,0.10)]">
+      <section className="terminal-panel rounded-2xl border-[#3B82F6]/20 bg-[#13213A]/70 p-4 shadow-[0_20px_80px_rgba(59,130,246,0.10)]">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-[18px] font-bold text-white">Coach&apos;s Note</h2>
+          <h2 className="text-[15px] font-bold text-white">Coach&apos;s Note</h2>
           <span className="rounded-full bg-[#3B82F6]/12 px-2 py-1 text-xs font-bold text-[#93C5FD]">Core</span>
         </div>
-        <p className="mt-4 text-sm leading-6 text-[#CBD5E1]">See what your AI coach would say — upgrade to unlock weekly coaching grounded in your trading history.</p>
-        <a className="mt-5 inline-flex rounded-xl bg-[#3B82F6] px-4 py-2 text-sm font-bold text-white" href="/settings">
+        <p className="mt-3 text-sm leading-6 text-[#CBD5E1]">See what your AI coach would say — upgrade to unlock weekly coaching grounded in your trading history.</p>
+        <a className="mt-3 inline-flex rounded-xl bg-[#3B82F6] px-4 py-2 text-sm font-bold text-white" href="/settings">
           Upgrade to unlock
         </a>
       </section>
@@ -1309,10 +1333,10 @@ function CoachNoteWidget({ isSample, locked, review }: { isSample: boolean; lock
   const display = review ?? (isSample ? SAMPLE_WEEKLY_REVIEW : null);
   if (!display) {
     return (
-      <section className="rounded-2xl border border-white/[0.06] bg-[#141A2A]/70 p-6">
-        <h2 className="text-[18px] font-bold text-white">Coach&apos;s Note</h2>
-        <p className="mt-4 text-sm leading-6 text-[#94A3B8]">Your first coaching review will appear after your first full week of synced trades.</p>
-        <Link className="mt-4 inline-flex text-sm font-bold text-[#93C5FD] hover:text-white" href="/#coaching">
+      <section className="terminal-panel rounded-2xl p-4">
+        <h2 className="text-[15px] font-bold text-white">Coach&apos;s Note</h2>
+        <p className="mt-3 text-sm leading-6 text-[#94A3B8]">Your first coaching review will appear after your first full week of synced trades.</p>
+        <Link className="mt-3 inline-flex text-sm font-bold text-[#93C5FD] hover:text-white" href="/#coaching">
           Learn how this works
         </Link>
       </section>
@@ -1321,14 +1345,14 @@ function CoachNoteWidget({ isSample, locked, review }: { isSample: boolean; lock
 
   const topLeak = [...display.leaks].sort((a, b) => severityRank(a.severity) - severityRank(b.severity))[0];
   return (
-    <section className="rounded-2xl border border-white/[0.06] bg-[#141A2A]/70 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+    <section className="terminal-panel rounded-2xl p-4">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-[18px] font-bold text-white">Coach&apos;s Note</h2>
+        <h2 className="text-[15px] font-bold text-white">Coach&apos;s Note</h2>
         {isSample ? <span className="rounded-full bg-[#3B82F6]/12 px-2 py-1 text-xs font-bold text-[#93C5FD]">Sample coaching note</span> : null}
       </div>
-      <p className="mt-4 line-clamp-2 text-sm leading-6 text-[#CBD5E1]">{display.summary}</p>
+      <p className="mt-3 line-clamp-2 text-sm leading-6 text-[#CBD5E1]">{display.summary}</p>
       {topLeak ? (
-        <div className="mt-4 rounded-xl border border-white/[0.06] bg-black/20 p-3">
+        <div className="mt-3 rounded-xl border border-white/[0.06] bg-black/20 p-3">
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs font-bold uppercase text-[#94A3B8]">{humanLeakType(topLeak.type)}</p>
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${topLeak.severity === "critical" ? "bg-[#EF4444]/15 text-[#FCA5A5]" : topLeak.severity === "warning" ? "bg-[#F59E0B]/15 text-[#FCD34D]" : "bg-[#3B82F6]/15 text-[#93C5FD]"}`}>
@@ -1338,7 +1362,7 @@ function CoachNoteWidget({ isSample, locked, review }: { isSample: boolean; lock
           <p className="mt-2 text-sm leading-5 text-[#CBD5E1]">{topLeak.explanation}</p>
         </div>
       ) : null}
-      <a className="mt-5 inline-flex text-sm font-bold text-[#93C5FD] hover:text-white" href="/journal/review">
+      <a className="mt-3 inline-flex text-sm font-bold text-[#93C5FD] hover:text-white" href="/journal/review">
         View full review
       </a>
     </section>
@@ -1348,37 +1372,27 @@ function CoachNoteWidget({ isSample, locked, review }: { isSample: boolean; lock
 function RiskRoomWidget({ currency, status }: { currency: string; status: GuardrailStatus | null }) {
   if (!status) {
     return (
-      <section className="min-h-[260px] rounded-2xl border border-white/[0.06] bg-[#141A2A]/70 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-        <h2 className="text-[18px] font-bold text-white">Risk Room</h2>
+      <section className="terminal-panel rounded-2xl p-4">
+        <h2 className="text-[15px] font-bold text-white">Risk Room</h2>
         <p className="mt-3 text-sm leading-6 text-[#94A3B8]">Set up prop firm rules to track your risk room.</p>
-        <div className="mt-5 space-y-4 rounded-2xl border border-white/[0.06] bg-black/20 p-4 opacity-70">
-          {[
-            ["Daily loss used", "35%"],
-            ["Drawdown room", "52%"],
-            ["Target progress", "68%"]
-          ].map(([label, width]) => (
-            <div key={label}>
-              <div className="flex items-center justify-between text-xs font-semibold text-[#64748B]">
-                <span>{label}</span>
-                <span>Preview</span>
-              </div>
-              <div className="mt-2 h-2 rounded-full bg-white/[0.06]">
-                <div className="h-full rounded-full bg-[#64748B]/60" style={{ width }} />
-              </div>
-            </div>
-          ))}
+        <div className="mt-3">
+          <EmptyPreview
+            title="Preview once configured"
+            cta={
+              <a className="inline-flex rounded-xl bg-[#3B82F6] px-4 py-2 text-sm font-bold text-white" href="/settings/prop-rules">
+                Open Settings
+              </a>
+            }
+          />
         </div>
-        <a className="mt-5 inline-flex rounded-xl bg-[#3B82F6] px-4 py-2 text-sm font-bold text-white" href="/settings">
-          Open Settings
-        </a>
       </section>
     );
   }
 
   return (
-    <section className="min-h-[260px] rounded-2xl border border-white/[0.06] bg-[#141A2A]/70 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <h2 className="text-[18px] font-bold text-white">Risk Room</h2>
-      <div className="mt-5 space-y-4">
+    <section className="terminal-panel rounded-2xl p-4">
+      <h2 className="text-[15px] font-bold text-white">Risk Room</h2>
+      <div className="mt-3 space-y-3">
         {status.dailyLoss ? <RiskBar label="Daily loss used" pct={status.dailyLoss.usedPct} remaining={formatCurrency(status.dailyLoss.remainingAmount, currency)} status={status.dailyLoss.status} /> : null}
         {status.drawdown ? <RiskBar label="Drawdown used" pct={status.drawdown.usedPct} remaining={formatCurrency(status.drawdown.remainingAmount, currency)} status={status.drawdown.status} /> : null}
         {status.profitTarget ? <RiskBar label="Profit target progress" pct={status.profitTarget.progressPct} remaining={status.profitTarget.status === "reached" ? "Reached" : "In progress"} status={status.profitTarget.status === "reached" ? "ok" : "warning"} /> : null}
@@ -1395,7 +1409,7 @@ function RiskBar({ label, pct, remaining, status }: { label: string; pct: number
         <span>{label}</span>
         <span className="tabular-nums">{Math.round(pct * 100)}% · {remaining}</span>
       </div>
-      <div className="mt-2 h-2 rounded-full bg-white/[0.06]">
+      <div className="mt-1.5 h-1.5 rounded-full bg-white/[0.06]">
         <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(100, Math.max(0, pct * 100))}%` }} />
       </div>
     </div>
@@ -1417,11 +1431,11 @@ function RecentTradesWidget({
 }) {
   const visibleTrades = selectedDate ? trades.filter((trade) => trade.closeTime.slice(0, 10) === selectedDate) : trades;
   return (
-    <section className="rounded-2xl border border-white/[0.06] bg-[#141A2A]/70 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+    <section className="terminal-panel rounded-2xl p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-[18px] font-bold text-white">Recent Trades</h2>
-          <p className="mt-2 text-sm font-medium text-[#94A3B8]">{isSample ? "Sample closed trades until broker history is connected." : "Last closed trades for this period."}</p>
+          <h2 className="text-[15px] font-bold text-white">Recent Trades</h2>
+          <p className="mt-1 text-xs font-semibold text-[#94A3B8]">{isSample ? "Sample closed trades until broker history is connected." : "Last closed trades for this period."}</p>
         </div>
         <div className="flex flex-col items-end gap-2">
           {isSample ? <span className="rounded-full bg-[#3B82F6]/12 px-2 py-1 text-xs font-bold text-[#93C5FD]">Sample</span> : null}
@@ -1430,7 +1444,7 @@ function RecentTradesWidget({
           </Link>
         </div>
       </div>
-      <div className="mt-5 divide-y divide-white/[0.06]">
+      <div className="mt-3 divide-y divide-white/[0.06]">
         {visibleTrades.slice(0, 6).map((trade) => (
           <a className="grid grid-cols-[1fr_auto] gap-3 py-3 text-sm transition hover:bg-white/[0.03]" href={`/trades/${trade.id}?from=${encodeURIComponent(returnHref)}`} key={trade.id}>
             <span>
@@ -1516,16 +1530,16 @@ function ActivityCalendar({
   const maxAbs = Math.max(1, ...series.map((point) => Math.abs(point.netPnl)));
 
   return (
-    <section className="relative rounded-2xl border border-white/[0.06] bg-[#141A2A]/70 p-6 shadow-[0_1px_2px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.04)]">
+    <section className="terminal-panel relative rounded-2xl p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-[18px] font-bold tracking-normal text-white">Activity Calendar</h2>
-          <p className="mt-2 text-sm font-medium text-[#94A3B8]">P&L heatmap by close date</p>
+          <h2 className="text-[15px] font-bold tracking-normal text-white">Activity Calendar</h2>
+          <p className="mt-1 text-xs font-semibold text-[#94A3B8]">P&L heatmap by close date</p>
         </div>
         <span className="rounded-full border border-white/[0.08] px-2 py-1 text-xs font-bold capitalize text-[#94A3B8]">{granularity}</span>
       </div>
 
-      <div className={`mt-5 rounded-2xl bg-black/35 p-5 ${canUseCalendar ? "" : "blur-[2px]"}`}>
+      <div className={`mt-3 rounded-2xl bg-black/35 p-3 ${canUseCalendar ? "" : "blur-[2px]"}`}>
         {granularity === "year" ? (
           <YearHeatmap activityByDay={activityByDay} currency={currency} days={visibleDays} maxAbs={maxAbs} selectedDate={selectedDate} setSelectedDate={setSelectedDate} />
         ) : (
@@ -1535,7 +1549,7 @@ function ActivityCalendar({
                 <div key={day}>{day}</div>
               ))}
             </div>
-            <div className={`mt-3 grid grid-cols-7 ${granularity === "month" ? "gap-2" : "gap-3"}`}>
+            <div className={`mt-3 grid grid-cols-7 ${granularity === "month" ? "gap-1.5" : "gap-2"}`}>
               {visibleDays.map((day, index) => (
                 <HeatmapDay
                   activity={activityByDay.get(day)}
@@ -1560,7 +1574,7 @@ function ActivityCalendar({
         </div>
       </div>
       {!canUseCalendar ? (
-        <div className="absolute inset-0 grid place-items-center rounded-2xl bg-[#0A0E1A]/55 p-6 text-center">
+        <div className="absolute inset-0 grid place-items-center rounded-2xl bg-[#0A0E1A]/55 p-4 text-center">
           <div className="max-w-xs rounded-2xl border border-white/[0.08] bg-[#111827] p-5">
             <LockKeyhole className="mx-auto h-6 w-6 text-[#3B82F6]" aria-hidden />
             <p className="mt-3 text-sm font-bold text-white">Activity heatmap is a Core feature</p>
@@ -1757,11 +1771,15 @@ function getAccountContext(account: AccountSummary | null | undefined, isSample:
 
 function scopeSampleMetricsToDay(metrics: MetricsResponse, date: string): MetricsResponse {
   const current = metrics.dailySeries.find((point) => point.date === date) ?? {
+    breakevenTrades: 0,
     cumulativePnl: 0,
     date,
+    losingTrades: 0,
     netPnl: 0,
+    rMultipleSum: 0,
     tradeCount: 0,
-    winRate: 0
+    winRate: 0,
+    winningTrades: 0
   };
   const currentIndex = metrics.dailySeries.findIndex((point) => point.date === date);
   const previous = currentIndex > 0 ? metrics.dailySeries[currentIndex - 1] : undefined;

@@ -48,6 +48,10 @@ enum TradeSide {
 enum TradingPlatform {
   MT4
   MT5
+  CTRADER
+  DXTRADE
+  MATCHTRADER
+  CSV
 }
 
 enum TradingSession {
@@ -103,6 +107,8 @@ model UserPreference {
   onboardingCompletedAt    DateTime?
   onboardingSampleModeAt   DateTime?
   notificationPreferences  Json?
+  dashboardViews           Json?
+  tradeExplorerPrefs       Json?
   displayCurrencyAccountId String?
   timeZone                 String?
   createdAt                DateTime  @default(now())

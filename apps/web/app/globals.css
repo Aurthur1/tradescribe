@@ -26,7 +26,25 @@
   --ts-amber: #fbbf24;
   --ts-radius-card: 14px;
   --ts-radius-button: 10px;
-  --font-geist: "Geist", "Satoshi", "General Sans";
+  --font-geist: "Geist", "Inter Tight", "Satoshi", "General Sans";
+  --font-geist-mono: "Geist Mono", "JetBrains Mono", "SFMono-Regular";
+  --bg-0: #070b14;
+  --bg-1: #0b1120;
+  --bg-2: #0f1626;
+  --bg-3: #141c2e;
+  --border-hairline: rgba(255, 255, 255, 0.06);
+  --border-active: rgba(255, 255, 255, 0.1);
+  --text-hi: #f1f5f9;
+  --text-mid: #94a3b8;
+  --text-low: #64748b;
+  --accent-blue: #3b82f6;
+  --accent-cyan: #22d3ee;
+  --pos: #34d399;
+  --neg: #f87171;
+  --warn: #fbbf24;
+  --crit: #fb7185;
+  --terminal-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --terminal-card-hover-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 * {
@@ -37,7 +55,9 @@ body {
   margin: 0;
   min-height: 100dvh;
   overflow-x: hidden;
-  background: hsl(var(--background));
+  background:
+    radial-gradient(circle at 1px 1px, rgba(148, 163, 184, 0.11) 1px, transparent 0) 0 0 / 22px 22px,
+    var(--bg-0);
   color: hsl(var(--foreground));
   font-feature-settings:
     "kern" 1,
@@ -45,6 +65,49 @@ body {
     "calt" 1;
   letter-spacing: 0;
   text-rendering: geometricPrecision;
+}
+
+.terminal-panel {
+  border: 1px solid var(--border-hairline);
+  background: color-mix(in srgb, var(--bg-2) 84%, transparent);
+  box-shadow: var(--terminal-card-shadow);
+}
+
+.terminal-panel-interactive {
+  transition:
+    transform 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    background-color 150ms ease;
+}
+
+.terminal-panel-interactive:hover {
+  border-color: var(--border-active);
+  box-shadow: var(--terminal-card-hover-shadow);
+  transform: translateY(-2px);
+}
+
+.control {
+  height: 2.5rem;
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(7, 11, 20, 0.78);
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-hi);
+  outline: none;
+}
+
+.control:focus {
+  box-shadow: 0 0 0 2px var(--accent-blue);
+}
+
+.terminal-number {
+  font-family: var(--font-geist-mono), "JetBrains Mono", "SFMono-Regular", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
 }
 
 html {

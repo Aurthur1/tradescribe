@@ -96,6 +96,11 @@ export interface DailyPoint {
   date: string;
   netPnl: number;
   tradeCount: number;
+  winningTrades: number;
+  losingTrades: number;
+  breakevenTrades: number;
+  rMultipleSum: number;
+  winRate: number;
   cumulativePnl: number;
 }
 
@@ -119,6 +124,7 @@ export interface CoreMetrics {
   grossWin: number;
   grossLoss: number; // <= 0
   totalTrades: number;
+  totalVolume: number;
   winningTrades: number;
   losingTrades: number;
   breakevenTrades: number;

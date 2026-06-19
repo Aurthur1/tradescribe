@@ -69,7 +69,7 @@ export default function ConnectionsPage() {
   }
 
   return (
-    <SettingsShell description="Manage MetaTrader connections, account labels, sync status, and broker access." title="Connections">
+    <SettingsShell description="Manage live adapters, CSV imports, account labels, sync status, and read-only broker access." title="Connections">
       <div>
         <div className="flex flex-wrap items-center justify-between gap-4">
           <a
@@ -80,13 +80,13 @@ export default function ConnectionsPage() {
             href={canConnectMore ? "/import" : "/settings"}
           >
             <PlugZap className="h-4 w-4" aria-hidden />
-            Connect another account
+            Connect or import account
           </a>
 
           <div className="flex flex-wrap items-center gap-3 text-sm">
-          <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 font-semibold text-[#CBD5E1]">
-            {accountCount}{payload?.limits.maxAccounts ? ` / ${payload.limits.maxAccounts}` : ""} accounts
-          </span>
+            <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 font-semibold text-[#CBD5E1]">
+              {accountCount}{payload?.limits.maxAccounts ? ` / ${payload.limits.maxAccounts}` : ""} accounts
+            </span>
             {!canConnectMore ? <span className="rounded-full bg-[#3B82F6]/12 px-3 py-1 text-xs font-bold text-[#93C5FD]">Plan limit reached — upgrade to add another account</span> : null}
             {status ? <span className="text-xs font-semibold text-[#94A3B8]">{status}</span> : null}
           </div>
@@ -168,15 +168,19 @@ function ConnectionCard({
 }) {
   const platformLabel = useMemo(() => connection.accounts.map((account) => account.platform).filter(Boolean).join(", ") || "MT", [connection.accounts]);
   return (
-    <article className="rounded-2xl border border-white/[0.06] bg-[#141A2A]/75 p-5">
+    <article className="rounded-2xl border border-white/[0.06] bg-[#141A2A]/75 p-4">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <StatusDot status={connection.status} />
             <h2 className="text-lg font-bold text-white">{connection.provider}</h2>
             <span className="rounded-full border border-white/[0.08] px-2 py-1 text-[11px] font-bold text-[#94A3B8]">{platformLabel}</span>
+            <span className="rounded-full bg-[#3B82F6]/12 px-2 py-1 text-[11px] font-bold uppercase text-[#93C5FD]">Read-only</span>
           </div>
           <p className="mt-2 text-sm font-medium text-[#94A3B8]">Last sync {formatTime(connection.lastSyncAt)}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <CapabilityChips capabilities={connection.capabilities} />
+          </div>
           {connection.lastError ? <p className="mt-2 max-w-xl text-sm font-semibold text-[#FCA5A5]">{connection.lastError}</p> : null}
         </div>
         <div className="flex flex-wrap gap-2">
@@ -184,6 +188,11 @@ function ConnectionCard({
             <RefreshCw className="h-4 w-4" aria-hidden />
             Re-sync now
           </button>
+          {connection.status === "DEGRADED" || connection.status === "DISCONNECTED" ? (
+            <a className="inline-flex items-center gap-2 rounded-xl border border-[#3B82F6]/25 px-3 py-2 text-sm font-bold text-[#93C5FD] hover:bg-[#3B82F6]/10" href="/import">
+              Reconnect
+            </a>
+          ) : null}
           <button className="inline-flex items-center gap-2 rounded-xl border border-[#EF4444]/20 px-3 py-2 text-sm font-bold text-[#FCA5A5] hover:bg-[#EF4444]/10" onClick={onDisconnect} type="button">
             <Trash2 className="h-4 w-4" aria-hidden />
             Disconnect
@@ -191,12 +200,20 @@ function ConnectionCard({
         </div>
       </div>
 
-      <div className="mt-5 divide-y divide-white/[0.06] overflow-hidden rounded-xl border border-white/[0.06] bg-black/20">
+      <div className="mt-5 overflow-hidden rounded-xl border border-white/[0.06] bg-black/20">
+        <div className="hidden grid-cols-[1.2fr_0.5fr_0.7fr_0.8fr_1fr_auto] gap-3 border-b border-white/[0.06] px-4 py-3 text-[11px] font-bold uppercase text-[#64748B] md:grid">
+          <span>Account</span>
+          <span>Platform</span>
+          <span>Login</span>
+          <span>Balance</span>
+          <span>Capabilities</span>
+          <span className="text-right">Actions</span>
+        </div>
         {connection.accounts.map((account) => {
           const editValue = editing[account.id];
           const isEditing = editValue !== undefined;
           return (
-            <div className="grid gap-3 p-4 text-sm md:grid-cols-[1fr_0.7fr_0.7fr_0.9fr_auto]" key={account.id}>
+            <div className="grid gap-3 border-b border-white/[0.06] p-4 text-sm last:border-b-0 md:grid-cols-[1.2fr_0.5fr_0.7fr_0.8fr_1fr_auto]" key={account.id}>
               <div className="min-w-0">
                 {isEditing ? (
                   <input className="h-10 w-full rounded-xl border border-white/[0.08] bg-[#0A0E1A] px-3 font-semibold text-white outline-none focus:ring-2 focus:ring-[#3B82F6]" onChange={(event) => onEdit(account.id, event.target.value)} value={editValue} />
@@ -207,9 +224,12 @@ function ConnectionCard({
                   </>
                 )}
               </div>
-              <span className="font-semibold text-[#CBD5E1]">{account.platform}</span>
+              <span className="w-fit rounded-full border border-white/[0.08] px-2 py-1 text-xs font-bold text-[#CBD5E1]">{account.platform}</span>
               <span className="font-semibold text-[#94A3B8]">#{account.maskedLogin}</span>
               <span className="font-bold text-white tabular-nums">{formatCurrency(account.balance ?? 0, account.currency)}</span>
+              <div className="flex flex-wrap gap-1">
+                <CapabilityChips capabilities={account.capabilities} compact />
+              </div>
               <div className="flex justify-end gap-2">
                 {isEditing ? (
                   <>
@@ -244,7 +264,22 @@ function StatusDot({ status }: { status?: string }) {
         : status === "DEGRADED" || status === "ERROR" || status === "DISCONNECTED"
           ? "bg-[#EF4444]"
           : "bg-[#64748B]";
-  return <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${color}`} aria-hidden />;
+  const pulse = status === "CONNECTED" || status === "SYNCING" || status === "PROVISIONING";
+  return <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${color} ${pulse ? "animate-pulse" : ""}`} aria-hidden />;
+}
+
+function CapabilityChips({ capabilities, compact }: { capabilities?: ConnectionsResponse["connections"][number]["capabilities"]; compact?: boolean }) {
+  const entries = Object.entries(capabilities ?? {}).filter(([, value]) => value);
+  if (!entries.length) return <span className="rounded-full bg-white/[0.04] px-2 py-1 text-[10px] font-bold uppercase text-[#64748B]">Limited</span>;
+  return (
+    <>
+      {entries.map(([key]) => (
+        <span className={`rounded-full bg-[#3B82F6]/12 font-bold uppercase text-[#93C5FD] ${compact ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-1 text-[10px]"}`} key={key}>
+          {key.replace(/([A-Z])/g, " $1")}
+        </span>
+      ))}
+    </>
+  );
 }
 
 function formatTime(value?: string | null) {

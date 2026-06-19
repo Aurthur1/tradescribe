@@ -17,6 +17,7 @@
     "paths": {
       "@tradescribe/ai": ["packages/ai/src/index.ts"],
       "@tradescribe/billing": ["packages/billing/src/index.ts"],
+      "@tradescribe/brokers": ["packages/brokers/src/index.ts"],
       "@tradescribe/db": ["packages/db/src/index.ts"],
       "@tradescribe/metaapi": ["packages/metaapi/src/index.ts"],
       "@tradescribe/metrics": ["packages/metrics/src/index.ts"],

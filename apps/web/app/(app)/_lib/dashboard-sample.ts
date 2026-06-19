@@ -34,13 +34,13 @@ export const SAMPLE_DASHBOARD_DATA: MetricsResponse = {
     { netPnl: 1200, trades: 16, weekday: "Sun", winRate: 0.69 }
   ],
   dailySeries: [
-    { cumulativePnl: 1200, date: "2025-04-06", netPnl: 1200, tradeCount: 16, winRate: 0.69 },
-    { cumulativePnl: 500, date: "2025-04-07", netPnl: -700, tradeCount: 11, winRate: 0.45 },
-    { cumulativePnl: 1900, date: "2025-04-08", netPnl: 1400, tradeCount: 18, winRate: 0.72 },
-    { cumulativePnl: 3900, date: "2025-04-09", netPnl: 2000, tradeCount: 24, winRate: 0.75 },
-    { cumulativePnl: 2700, date: "2025-04-10", netPnl: -1200, tradeCount: 19, winRate: 0.47 },
-    { cumulativePnl: 2700, date: "2025-04-11", netPnl: 0, tradeCount: 21, winRate: 0.57 },
-    { cumulativePnl: 2700, date: "2025-04-12", netPnl: 0, tradeCount: 19, winRate: 0.58 }
+    { breakevenTrades: 1, cumulativePnl: 1200, date: "2025-04-06", losingTrades: 4, netPnl: 1200, rMultipleSum: 4.1, tradeCount: 16, winRate: 0.69, winningTrades: 11 },
+    { breakevenTrades: 1, cumulativePnl: 500, date: "2025-04-07", losingTrades: 5, netPnl: -700, rMultipleSum: -2.4, tradeCount: 11, winRate: 0.45, winningTrades: 5 },
+    { breakevenTrades: 0, cumulativePnl: 1900, date: "2025-04-08", losingTrades: 5, netPnl: 1400, rMultipleSum: 5.2, tradeCount: 18, winRate: 0.72, winningTrades: 13 },
+    { breakevenTrades: 1, cumulativePnl: 3900, date: "2025-04-09", losingTrades: 5, netPnl: 2000, rMultipleSum: 7.8, tradeCount: 24, winRate: 0.75, winningTrades: 18 },
+    { breakevenTrades: 1, cumulativePnl: 2700, date: "2025-04-10", losingTrades: 9, netPnl: -1200, rMultipleSum: -3.1, tradeCount: 19, winRate: 0.47, winningTrades: 9 },
+    { breakevenTrades: 2, cumulativePnl: 2700, date: "2025-04-11", losingTrades: 7, netPnl: 0, rMultipleSum: 0.2, tradeCount: 21, winRate: 0.57, winningTrades: 12 },
+    { breakevenTrades: 2, cumulativePnl: 2700, date: "2025-04-12", losingTrades: 6, netPnl: 0, rMultipleSum: 0, tradeCount: 19, winRate: 0.58, winningTrades: 11 }
   ],
   deltas: {
     netPnl: { absolute: 204.62, current: 2700, percent: 0.082, previous: 2495.38 },
@@ -80,6 +80,7 @@ export const SAMPLE_DASHBOARD_DATA: MetricsResponse = {
     { bin: "> 3R", count: 5, netPnl: 1310 }
   ],
   totalTrades: 128,
+  totalVolume: 126.4,
   winRate: 0.64,
   winningTrades: 82,
   worstDay: { date: "2025-04-10", netPnl: -1200 }
@@ -288,8 +289,8 @@ export const SAMPLE_COACH_PROFILE: CoachProfileResponse = {
   profile: {
     goals: ["Max 3 trades/day", "No re-entry within 5 minutes of a full-risk loss"],
     recurringLeaks: [
-      { count: 4, label: "Revenge trading", weeks: 6 },
-      { count: 3, label: "Overtrading", weeks: 6 }
+      { count: 4, label: "Revenge trading", trend: [0, 1, 1, 0, 1, 1], weeks: 6 },
+      { count: 3, label: "Overtrading", trend: [1, 0, 1, 0, 0, 1], weeks: 6 }
     ],
     riskProfileSummary: "You perform best when planned risk is visible before entry and session limits are decided before the first trade.",
     updatedAt: "2025-04-13T09:00:00.000Z"

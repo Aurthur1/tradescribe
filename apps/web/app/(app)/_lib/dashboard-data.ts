@@ -6,6 +6,15 @@ import { SAMPLE_DASHBOARD_DATA } from "./dashboard-sample";
 export type Granularity = "day" | "week" | "month" | "year";
 export type TradingSession = "Sydney" | "Tokyo" | "London" | "New York";
 export type TradeSide = "BUY" | "SELL";
+export type BrokerPlatform = "MT4" | "MT5" | "CTRADER" | "DXTRADE" | "MATCHTRADER" | "CSV";
+
+export interface BrokerCapabilities {
+  csvImport: boolean;
+  equitySeries: boolean;
+  liveSync: boolean;
+  orderModificationHistory: boolean;
+  readOnly: boolean;
+}
 
 export interface AccountSummary {
   balance?: number;
@@ -16,11 +25,12 @@ export interface AccountSummary {
   name: string;
   login: string;
   maskedLogin?: string;
-  platform: "MT4" | "MT5";
+  platform: BrokerPlatform;
   currency: string;
   equity?: number;
   isPrimary: boolean;
   connectionStatus: string;
+  capabilities?: BrokerCapabilities;
   lastSyncAt?: string | null;
 }
 
@@ -41,6 +51,8 @@ export interface CurrentUserResponse {
   };
   preferences: {
     activeAccountId: string | null;
+    dashboardViews?: SavedDashboardView[];
+    tradeExplorerPrefs?: TradeExplorerPrefs | null;
     displayCurrencyAccountId?: string | null;
     notificationPreferences?: NotificationPreferences;
     onboardingCompletedAt?: string | null;
@@ -61,6 +73,10 @@ export interface DailyPoint {
   date: string;
   netPnl: number;
   tradeCount: number;
+  winningTrades: number;
+  losingTrades: number;
+  breakevenTrades: number;
+  rMultipleSum: number;
   cumulativePnl: number;
   winRate?: number;
 }
@@ -192,15 +208,27 @@ export interface TradeDetailResponse {
 export interface TradesListResponse {
   data: Array<RecentTrade & {
     commission: number;
+    closePrice?: number;
+    durationSec?: number | null;
+    emotionTags?: string[];
     grossProfit: number;
+    hasNote?: boolean;
+    hasScreenshot?: boolean;
+    journalEntry?: JournalEntryResponse | null;
+    leakFlags?: Array<{ id: string; severity: LeakSeverity; type: LeakType | string }>;
+    netProfit: number;
     notes?: TradeNoteResponse[];
+    openPrice?: number;
     openTime: string;
     playbook?: PlaybookSummary | null;
     playbookId?: string | null;
+    rMultiple?: number | null;
     session?: TradingSession | null;
+    screenshots?: TradeScreenshotResponse[];
     swap: number;
     volume: number;
   }>;
+  metrics?: MetricsResponse;
   page: number;
   pageSize: number;
   total: number;
@@ -243,6 +271,16 @@ export interface PlaybookPerformanceResponse {
   period: { label: string; granularity: Granularity };
   playbook: Playbook;
   recentTrades: TradesListResponse["data"];
+  ruleAdherence?: {
+    adherencePct: number | null;
+    brokenMetrics: MetricsResponse;
+    brokenTrades: number;
+    configuredRules: number;
+    delta: { expectancyR: number | null; netPnl: number };
+    followedMetrics: MetricsResponse;
+    followedTrades: number;
+    reviewedTrades: number;
+  };
 }
 
 export interface PlaybookPerformanceSummaryResponse {
@@ -262,8 +300,9 @@ export interface PortfolioResponse {
 
 export interface ConnectionsResponse {
   connections: Array<{
-    accounts: Array<AccountSummary & { status: string }>;
+    accounts: Array<AccountSummary & { status: string; capabilities?: BrokerCapabilities }>;
     broker: string;
+    capabilities?: BrokerCapabilities;
     id: string;
     lastError?: string | null;
     lastSyncAt?: string | null;
@@ -290,7 +329,7 @@ export interface SettingsResponse {
     label?: string | null;
     maskedLogin: string;
     name: string;
-    platform: "MT4" | "MT5";
+    platform: BrokerPlatform;
   }>;
   billing: {
     amountCents: number;
@@ -372,6 +411,44 @@ export interface ConnectionStatusResponse {
   tradingAccounts?: Array<{ id: string }>;
 }
 
+export interface BrokerAdaptersResponse {
+  adapters: Array<{
+    capabilities: BrokerCapabilities;
+    id: string;
+    label: string;
+    platforms: BrokerPlatform[];
+    status: "available" | "beta_coming_soon" | "coming_soon";
+  }>;
+}
+
+export interface CsvImportPreviewResponse {
+  delimiter: string;
+  errors: Array<{ message: string; row: number }>;
+  headers: string[];
+  mapping: Record<string, string>;
+  preview: Array<{
+    closeTime: string;
+    externalId: string;
+    grossProfit: number;
+    side: TradeSide;
+    symbol: string;
+    volume: number;
+  }>;
+  rowsOk: number;
+  rowsSkipped: number;
+  totalRows: number;
+}
+
+export interface CsvImportCommitResponse {
+  accountId: string;
+  connectionId: string;
+  created: number;
+  errors: Array<{ message: string; row: number }>;
+  skipped: number;
+  totalRows: number;
+  updated: number;
+}
+
 export interface WeeklyReviewLeak {
   evidence: Record<string, number | string>;
   explanation: string;
@@ -402,11 +479,18 @@ export interface WeeklyReviewResponse {
   cooldownUntil?: string | null;
 }
 
+export interface WeeklyReviewListResponse {
+  locked: boolean;
+  reason?: string;
+  plan?: "FREE" | "CORE" | "PRO";
+  reviews: WeeklyReview[];
+}
+
 export interface CoachProfileResponse {
   locked: boolean;
   profile: {
     goals: string[];
-    recurringLeaks: Array<{ label: string; count: number; weeks: number }>;
+    recurringLeaks: Array<{ label: string; count: number; weeks: number; trend?: number[] }>;
     riskProfileSummary: string;
     updatedAt: string;
   };
@@ -427,6 +511,7 @@ export interface MetricsResponse {
   profitFactor: number | null;
   profitFactorReason: "no_trades" | "no_losses" | null;
   totalTrades: number;
+  totalVolume: number;
   winningTrades: number;
   losingTrades: number;
   breakevenTrades: number;
@@ -461,6 +546,8 @@ export interface MetricsResponse {
 
 export interface DashboardFilters {
   day?: string;
+  emotionTag?: string;
+  playbookId?: string;
   symbol?: string;
   session?: TradingSession;
   side?: TradeSide;
@@ -471,6 +558,21 @@ export interface DashboardLayoutItem {
   size: "sm" | "md" | "lg";
   visible: boolean;
   widgetId: string;
+}
+
+export interface SavedDashboardView {
+  anchor: string;
+  filters: DashboardFilters;
+  granularity: Granularity;
+  id: string;
+  layout: DashboardLayoutItem[];
+  name: string;
+}
+
+export interface TradeExplorerPrefs {
+  columnOrder: string[];
+  hiddenColumns: string[];
+  viewMode: "table" | "cards";
 }
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:4000";
@@ -585,7 +687,7 @@ export function useCurrentUser() {
           if (process.env.NODE_ENV !== "production") {
             setData({
               accounts: [],
-              preferences: { activeAccountId: null, onboardingCompletedAt: null, onboardingSampleModeAt: null },
+              preferences: { activeAccountId: null, dashboardViews: [], onboardingCompletedAt: null, onboardingSampleModeAt: null },
               subscription: null,
               user: {
                 email: "trader@example.com",
@@ -632,9 +734,11 @@ export function useMetrics(
     if (params.filters.symbol) query.set("symbol", params.filters.symbol);
     if (params.filters.session) query.set("session", params.filters.session);
     if (params.filters.side) query.set("side", params.filters.side);
+    if (params.filters.emotionTag) query.set("emotionTag", params.filters.emotionTag);
+    if (params.filters.playbookId) query.set("playbookId", params.filters.playbookId);
     if (params.filters.day) query.set("date", params.filters.day);
     return query.toString();
-  }, [params.anchor, params.filters.day, params.filters.session, params.filters.side, params.filters.symbol, params.granularity, params.tz]);
+  }, [params.anchor, params.filters.day, params.filters.emotionTag, params.filters.playbookId, params.filters.session, params.filters.side, params.filters.symbol, params.granularity, params.tz]);
 
   useEffect(() => {
     if (!accountId) {
@@ -755,8 +859,46 @@ export function fetchTrades(accountId: string, query: URLSearchParams, signal?: 
   return fetchJson<TradesListResponse>(`/accounts/${accountId}/trades?${query}`, signal);
 }
 
-export function savePreferences(payload: { activeAccountId: string | null }) {
-  return patchJson<{ activeAccountId: string | null; id: string; userId: string }>("/me/preferences", payload);
+export function useRecentTrades(accountId: string | null, params: { granularity: Granularity; anchor: string; tz: string; filters: DashboardFilters }) {
+  const [data, setData] = useState<RecentTrade[]>([]);
+  useEffect(() => {
+    if (!accountId) {
+      setData([]);
+      return;
+    }
+    const controller = new AbortController();
+    const query = new URLSearchParams({
+      anchor: params.anchor,
+      granularity: params.granularity,
+      pageSize: "6",
+      sort: "closeTime",
+      order: "desc",
+      tz: params.tz
+    });
+    if (params.filters.day) query.set("date", params.filters.day);
+    if (params.filters.symbol) query.set("symbol", params.filters.symbol);
+    if (params.filters.session) query.set("session", params.filters.session);
+    if (params.filters.side) query.set("side", params.filters.side);
+    if (params.filters.emotionTag) query.set("emotionTag", params.filters.emotionTag);
+    if (params.filters.playbookId) query.set("playbookId", params.filters.playbookId);
+    fetchTrades(accountId, query, controller.signal)
+      .then((payload) => setData(payload.data))
+      .catch(() => setData([]));
+    return () => controller.abort();
+  }, [accountId, params.anchor, params.filters.day, params.filters.emotionTag, params.filters.playbookId, params.filters.session, params.filters.side, params.filters.symbol, params.granularity, params.tz]);
+  return data;
+}
+
+export function savePreferences(payload: { activeAccountId?: string | null; dashboardViews?: SavedDashboardView[]; tradeExplorerPrefs?: TradeExplorerPrefs }) {
+  return patchJson<{ activeAccountId?: string | null; dashboardViews?: SavedDashboardView[]; tradeExplorerPrefs?: TradeExplorerPrefs; id: string; userId: string }>("/me/preferences", payload);
+}
+
+export function bulkSetTradePlaybook(tradeIds: string[], playbookId: string | null) {
+  return patchJson<{ updated: number }>("/trades/bulk/playbook", { playbookId, tradeIds });
+}
+
+export function bulkAddTradeEmotion(tradeIds: string[], emotionTag: string) {
+  return patchJson<{ updated: number }>("/trades/bulk/emotion", { emotionTag, tradeIds });
 }
 
 export function fetchSettings(signal?: AbortSignal) {
@@ -849,6 +991,10 @@ export function fetchConnections(signal?: AbortSignal) {
   return fetchJson<ConnectionsResponse>("/me/connections", signal);
 }
 
+export function fetchBrokerAdapters(signal?: AbortSignal) {
+  return fetchJson<BrokerAdaptersResponse>("/broker-adapters", signal);
+}
+
 export function createConnection(payload: {
   broker: string;
   currency: string;
@@ -860,6 +1006,21 @@ export function createConnection(payload: {
   startingBalance: number;
 }) {
   return postJson<CreatedConnectionResponse>("/connections", payload);
+}
+
+export function previewCsvImport(payload: { content: string; currency: string; mapping?: Record<string, string> }) {
+  return postJson<CsvImportPreviewResponse>("/imports/csv/preview", payload);
+}
+
+export function commitCsvImport(payload: {
+  broker: string;
+  content: string;
+  currency: string;
+  label: string;
+  mapping: Record<string, string>;
+  startingBalance: number;
+}) {
+  return postJson<CsvImportCommitResponse>("/imports/csv/commit", payload);
 }
 
 export function fetchConnectionStatus(connectionId: string, signal?: AbortSignal) {
@@ -892,6 +1053,11 @@ export function addTradeScreenshot(tradeId: string, payload: { filename?: string
 export function fetchWeeklyReview(signal?: AbortSignal, accountId?: string | null) {
   const query = accountId ? `?accountId=${encodeURIComponent(accountId)}` : "";
   return fetchJson<WeeklyReviewResponse>(`/reviews/weekly/latest${query}`, signal);
+}
+
+export function fetchWeeklyReviews(signal?: AbortSignal, accountId?: string | null) {
+  const query = accountId ? `?accountId=${encodeURIComponent(accountId)}` : "";
+  return fetchJson<WeeklyReviewListResponse>(`/reviews/weekly${query}`, signal);
 }
 
 export function generateWeeklyReview(accountId?: string | null) {

@@ -9,6 +9,7 @@ interface PrismaDelegate {
   findMany(input: unknown): Promise<unknown>;
   findUnique(input: unknown): Promise<unknown>;
   update(input: unknown): Promise<unknown>;
+  updateMany(input: unknown): Promise<{ count: number }>;
   upsert(input: unknown): Promise<unknown>;
 }
 

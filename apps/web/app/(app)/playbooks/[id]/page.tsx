@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, ArrowLeft, Edit3 } from "lucide-react";
+import { Archive, ArrowLeft, CheckCircle2, Edit3 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -49,6 +49,19 @@ export default function PlaybookDetailPage() {
 
   const sampleMetrics = useMemo(() => SAMPLE_PLAYBOOK_PERFORMANCE.playbooks.find((item) => item.id === id)?.metrics ?? SAMPLE_DASHBOARD_DATA, [id]);
   const metrics = sample ? sampleMetrics : performance?.metrics;
+  const ruleAdherence = useMemo(() => {
+    if (!sample || !sampleMetrics) return performance?.ruleAdherence;
+    return {
+      adherencePct: 0.74,
+      brokenMetrics: { ...sampleMetrics, expectancyR: -0.18, netPnl: -340, totalTrades: 9, winRate: 0.33 },
+      brokenTrades: 9,
+      configuredRules: sample.rules.length,
+      delta: { expectancyR: 0.82, netPnl: 1880 },
+      followedMetrics: { ...sampleMetrics, expectancyR: 0.64, netPnl: 1540, totalTrades: 25, winRate: 0.72 },
+      followedTrades: 25,
+      reviewedTrades: 34
+    };
+  }, [performance?.ruleAdherence, sample, sampleMetrics]);
   const recentTrades = sample
     ? SAMPLE_RECENT_TRADES.slice(0, 4).map((trade) => ({
         ...trade,
@@ -91,8 +104,11 @@ export default function PlaybookDetailPage() {
               </div>
               <p className="mt-3 text-sm leading-6 text-[#94A3B8]">{playbook.description || "No description yet."}</p>
               <div className="mt-4 flex flex-wrap gap-2">
-                {playbook.tags.map((tag) => (
+                {playbook.tags.filter((tag) => !tag.startsWith("__ts_")).map((tag) => (
                   <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-[11px] font-bold text-[#94A3B8]" key={tag}>{tag}</span>
+                ))}
+                {constraintTags(playbook.tags).map((tag) => (
+                  <span className="rounded-full border border-[#3B82F6]/20 bg-[#3B82F6]/10 px-2 py-1 text-[11px] font-bold text-[#93C5FD]" key={tag}>{tag}</span>
                 ))}
               </div>
             </div>
@@ -118,7 +134,7 @@ export default function PlaybookDetailPage() {
 
         <div className="mt-5 grid gap-5 xl:grid-cols-[0.8fr_1.2fr]">
           <RulesCard playbook={playbook} />
-          <PerformanceCard currency={currency} metrics={metrics} />
+          <PerformanceCard currency={currency} metrics={metrics} ruleAdherence={ruleAdherence} />
         </div>
 
         <section className="mt-5 rounded-2xl border border-white/[0.06] bg-[#141A2A]/75 p-6">
@@ -157,19 +173,63 @@ function RulesCard({ playbook }: { playbook: Playbook }) {
   );
 }
 
-function PerformanceCard({ currency, metrics }: { currency: string; metrics: MetricsResponse }) {
+function PerformanceCard({
+  currency,
+  metrics,
+  ruleAdherence
+}: {
+  currency: string;
+  metrics: MetricsResponse;
+  ruleAdherence?: PlaybookPerformanceResponse["ruleAdherence"];
+}) {
+  const maxHistogramCount = Math.max(1, ...metrics.rMultipleHistogram.map((bin) => bin.count));
   return (
-    <section className="rounded-2xl border border-white/[0.06] bg-[#141A2A]/75 p-6">
-      <h2 className="text-lg font-bold text-white">Performance</h2>
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+    <section className="rounded-2xl border border-white/[0.06] bg-[#141A2A]/75 p-5">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-white">Performance Lab</h2>
+          <p className="mt-1 text-xs font-semibold text-[#64748B]">Metrics are computed only from trades tagged to this playbook.</p>
+        </div>
+        <span className="rounded-full border border-[#3B82F6]/20 bg-[#3B82F6]/10 px-2 py-1 text-[11px] font-bold uppercase text-[#93C5FD]">Tagged edge</span>
+      </div>
+      <div className="mt-4 grid gap-2 sm:grid-cols-3 xl:grid-cols-4">
         <Metric label="Net P&L" tone={metrics.netPnl >= 0 ? "positive" : "negative"} value={formatCurrency(metrics.netPnl, currency)} />
         <Metric label="Win rate" value={`${Math.round(metrics.winRate * 100)}%`} />
         <Metric label="Profit factor" value={metrics.profitFactor == null ? "—" : metrics.profitFactor.toFixed(2)} />
-        <Metric label="Expectancy" value={formatCurrency(metrics.expectancyCurrency, currency)} />
+        <Metric label="Expectancy" value={`${formatCurrency(metrics.expectancyCurrency, currency)} / ${metrics.expectancyR == null ? "—" : `${metrics.expectancyR.toFixed(2)}R`}`} />
         <Metric label="Trades" value={String(metrics.totalTrades)} />
-        <Metric label="Drawdown" value={formatCurrency(metrics.drawdown.abs, currency)} />
+        <Metric label="Avg R win/loss" value={`${metrics.avgWinR == null ? "—" : metrics.avgWinR.toFixed(2)} / ${metrics.avgLossR == null ? "—" : metrics.avgLossR.toFixed(2)}`} />
+        <Metric label="Largest win/loss" value={`${formatCurrency(metrics.largestWin, currency)} / ${formatCurrency(metrics.largestLoss, currency)}`} />
+        <Metric label="Drawdown" value={`${formatCurrency(metrics.drawdown.abs, currency)} (${Math.round(metrics.drawdown.pct * 100)}%)`} />
       </div>
-      <MiniChart data={metrics.dailySeries} />
+      <div className="mt-4 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="rounded-xl border border-white/[0.06] bg-black/20 p-4">
+          <div className="mb-2 flex items-center justify-between text-xs font-bold uppercase text-[#64748B]">
+            <span>Equity curve</span>
+            <span>{metrics.bestDay ? `Best ${formatCurrency(metrics.bestDay.netPnl, currency)}` : "No trades"}</span>
+          </div>
+          <MiniChart data={metrics.dailySeries} />
+        </div>
+        <div className="rounded-xl border border-white/[0.06] bg-black/20 p-4">
+          <h3 className="text-sm font-bold text-white">R-multiple distribution</h3>
+          <div className="mt-3 space-y-2">
+            {metrics.rMultipleHistogram.map((bin) => (
+              <div className="grid grid-cols-[86px_1fr_42px] items-center gap-2 text-xs" key={bin.bin}>
+                <span className="truncate font-semibold text-[#94A3B8]">{bin.bin}</span>
+                <div className="h-2 rounded-full bg-white/[0.06]">
+                  <div className={`h-full rounded-full ${bin.netPnl >= 0 ? "bg-[#22C55E]" : "bg-[#EF4444]"}`} style={{ width: `${Math.max(4, (bin.count / maxHistogramCount) * 100)}%` }} />
+                </div>
+                <span className="text-right font-bold tabular-nums text-white">{bin.count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+        <Breakdown title="By session" rows={metrics.bySession.map((row) => ({ label: row.session, netPnl: row.netPnl, trades: row.trades, winRate: row.winRate }))} currency={currency} />
+        <Breakdown title="By symbol" rows={metrics.bySymbol.slice(0, 5).map((row) => ({ label: row.symbol, netPnl: row.netPnl, trades: row.trades, winRate: row.winRate }))} currency={currency} />
+        <RuleAdherenceCard currency={currency} ruleAdherence={ruleAdherence} />
+      </div>
     </section>
   );
 }
@@ -195,11 +255,82 @@ function MiniChart({ data }: { data: MetricsResponse["dailySeries"] }) {
     })
     .join(" ");
   return (
-    <svg className="mt-5 h-48 w-full overflow-visible rounded-xl bg-black/20" viewBox="0 0 600 190" role="img" aria-label="Playbook equity curve">
+    <svg className="h-48 w-full overflow-visible" viewBox="0 0 600 190" role="img" aria-label="Playbook equity curve">
       {[0, 1, 2].map((line) => (
         <line key={line} stroke="rgba(148,163,184,0.12)" strokeDasharray="5 8" x1="20" x2="580" y1={40 + line * 50} y2={40 + line * 50} />
       ))}
       <path d={path} fill="none" stroke="#3B82F6" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
     </svg>
   );
+}
+
+function Breakdown({ currency, rows, title }: { currency: string; rows: Array<{ label: string; netPnl: number; trades: number; winRate: number }>; title: string }) {
+  const maxAbs = Math.max(1, ...rows.map((row) => Math.abs(row.netPnl)));
+  return (
+    <div className="rounded-xl border border-white/[0.06] bg-black/20 p-4">
+      <h3 className="text-sm font-bold text-white">{title}</h3>
+      <div className="mt-3 space-y-3">
+        {rows.length === 0 ? <p className="text-sm font-semibold text-[#94A3B8]">No tagged trades in this period.</p> : null}
+        {rows.map((row) => (
+          <div key={row.label}>
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <span className="font-bold text-[#CBD5E1]">{row.label}</span>
+              <span className={`${row.netPnl >= 0 ? "text-[#22C55E]" : "text-[#EF4444]"} font-bold tabular-nums`}>{formatCurrency(row.netPnl, currency)}</span>
+            </div>
+            <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/[0.06]">
+              <div className={`h-full rounded-full ${row.netPnl >= 0 ? "bg-[#3B82F6]" : "bg-[#EF4444]"}`} style={{ width: `${Math.max(5, (Math.abs(row.netPnl) / maxAbs) * 100)}%` }} />
+            </div>
+            <div className="mt-1 flex justify-between text-[11px] font-semibold text-[#64748B]">
+              <span>{row.trades} trades</span>
+              <span>{Math.round(row.winRate * 100)}% WR</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RuleAdherenceCard({ currency, ruleAdherence }: { currency: string; ruleAdherence?: PlaybookPerformanceResponse["ruleAdherence"] }) {
+  if (!ruleAdherence || ruleAdherence.configuredRules === 0) {
+    return (
+      <div className="rounded-xl border border-white/[0.06] bg-black/20 p-4">
+        <h3 className="text-sm font-bold text-white">Rule adherence</h3>
+        <p className="mt-3 text-sm leading-6 text-[#94A3B8]">Add checklist rules to compare rule-following trades against broken-rule trades.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-white/[0.06] bg-black/20 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-bold text-white">Rule adherence</h3>
+        <CheckCircle2 className="h-4 w-4 text-[#22C55E]" aria-hidden />
+      </div>
+      <p className="mt-3 text-3xl font-bold tabular-nums text-white">{ruleAdherence.adherencePct == null ? "—" : `${Math.round(ruleAdherence.adherencePct * 100)}%`}</p>
+      <p className="mt-1 text-xs font-semibold text-[#94A3B8]">
+        {ruleAdherence.followedTrades} fully followed / {ruleAdherence.reviewedTrades} reviewed
+      </p>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <Metric label="Followed" tone={ruleAdherence.followedMetrics.netPnl >= 0 ? "positive" : "negative"} value={formatCurrency(ruleAdherence.followedMetrics.netPnl, currency)} />
+        <Metric label="Broken" tone={ruleAdherence.brokenMetrics.netPnl >= 0 ? "positive" : "negative"} value={formatCurrency(ruleAdherence.brokenMetrics.netPnl, currency)} />
+      </div>
+      <p className="mt-3 rounded-lg bg-[#3B82F6]/10 px-3 py-2 text-xs font-bold text-[#93C5FD]">
+        Delta: {formatCurrency(ruleAdherence.delta.netPnl, currency)}
+        {ruleAdherence.delta.expectancyR == null ? "" : ` / ${ruleAdherence.delta.expectancyR.toFixed(2)}R expectancy`}
+      </p>
+    </div>
+  );
+}
+
+function constraintTags(tags: string[]) {
+  return tags
+    .filter((tag) => tag.startsWith("__ts_"))
+    .map((tag) =>
+      tag
+        .replace("__ts_targetR=", "Target ")
+        .replace("__ts_maxRiskPct=", "Risk ")
+        .replace("__ts_session=", "")
+        .replace("__ts_symbol=", "")
+    );
 }

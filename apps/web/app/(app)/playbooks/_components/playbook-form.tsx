@@ -10,13 +10,19 @@ import { createPlaybook, updatePlaybook, type Playbook, type PlaybookPayload, ty
 const palette = ["#3B82F6", "#8B5CF6", "#22C55E", "#F59E0B", "#EF4444", "#14B8A6"];
 const inputClass =
   "min-h-11 w-full rounded-xl border border-white/[0.08] bg-[#0A0E1A] px-3 py-2.5 text-sm font-semibold text-white outline-none placeholder:text-[#475569] focus:ring-2 focus:ring-[#3B82F6]";
+const sessionOptions = ["Sydney", "Tokyo", "London", "New York"];
 
 export function PlaybookForm({ mode, playbook }: { mode: "create" | "edit"; playbook?: Playbook }) {
   const router = useRouter();
+  const initialConstraints = parseConstraintTags(playbook?.tags ?? []);
   const [name, setName] = useState(playbook?.name ?? "");
   const [description, setDescription] = useState(playbook?.description ?? "");
   const [color, setColor] = useState(playbook?.color ?? "#3B82F6");
-  const [tags, setTags] = useState((playbook?.tags ?? []).join(", "));
+  const [tags, setTags] = useState((playbook?.tags ?? []).filter((tag) => !tag.startsWith("__ts_")).join(", "));
+  const [targetR, setTargetR] = useState(initialConstraints.targetR);
+  const [maxRiskPct, setMaxRiskPct] = useState(initialConstraints.maxRiskPct);
+  const [allowedSessions, setAllowedSessions] = useState(initialConstraints.allowedSessions);
+  const [allowedSymbols, setAllowedSymbols] = useState(initialConstraints.allowedSymbols.join(", "));
   const [rules, setRules] = useState<PlaybookRule[]>(playbook?.rules?.length ? normalizeRules(playbook.rules) : [{ order: 0, text: "" }]);
   const [saving, setSaving] = useState<"idle" | "saving" | "error">("idle");
 
@@ -31,6 +37,7 @@ export function PlaybookForm({ mode, playbook }: { mode: "create" | "edit"; play
         .split(",")
         .map((tag) => tag.trim())
         .filter(Boolean)
+        .concat(buildConstraintTags({ allowedSessions, allowedSymbols, maxRiskPct, targetR }))
     };
     setSaving("saving");
     try {
@@ -97,6 +104,42 @@ export function PlaybookForm({ mode, playbook }: { mode: "create" | "edit"; play
       </section>
 
       <section className="rounded-2xl border border-white/[0.06] bg-[#141A2A]/75 p-4 sm:p-6">
+        <div>
+          <h2 className="text-lg font-bold text-white">Strategy Constraints</h2>
+          <p className="mt-1 text-sm font-semibold text-[#94A3B8]">Optional guardrails that make this playbook more than a label.</p>
+        </div>
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <Field label="Target R">
+            <input className={inputClass} inputMode="decimal" onChange={(event) => setTargetR(event.target.value)} placeholder="2.0" value={targetR} />
+          </Field>
+          <Field label="Max risk %">
+            <input className={inputClass} inputMode="decimal" onChange={(event) => setMaxRiskPct(event.target.value)} placeholder="1.0" value={maxRiskPct} />
+          </Field>
+          <div>
+            <span className="mb-2 block text-xs font-bold uppercase text-[#64748B]">Allowed sessions</span>
+            <div className="flex flex-wrap gap-2">
+              {sessionOptions.map((session) => {
+                const active = allowedSessions.includes(session);
+                return (
+                  <button
+                    className={`min-h-11 rounded-xl border px-3 py-2 text-sm font-bold transition ${active ? "border-[#3B82F6]/40 bg-[#3B82F6]/15 text-[#93C5FD]" : "border-white/[0.08] text-[#94A3B8] hover:bg-white/[0.04]"}`}
+                    key={session}
+                    onClick={() => setAllowedSessions((current) => (active ? current.filter((item) => item !== session) : [...current, session]))}
+                    type="button"
+                  >
+                    {session}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <Field label="Allowed symbols">
+            <input className={inputClass} onChange={(event) => setAllowedSymbols(event.target.value.toUpperCase())} placeholder="XAUUSD, EURUSD" value={allowedSymbols} />
+          </Field>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-white/[0.06] bg-[#141A2A]/75 p-4 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-bold text-white">Entry Rules</h2>
@@ -153,4 +196,37 @@ function IconButton({ children, disabled, label, onClick }: { children: ReactNod
 
 function normalizeRules(rules: PlaybookRule[]) {
   return rules.map((rule, index) => ({ order: index, text: rule.text }));
+}
+
+function parseConstraintTags(tags: string[]) {
+  const getValue = (prefix: string) => tags.find((tag) => tag.startsWith(prefix))?.slice(prefix.length) ?? "";
+  return {
+    allowedSessions: tags.filter((tag) => tag.startsWith("__ts_session=")).map((tag) => tag.slice("__ts_session=".length)),
+    allowedSymbols: tags.filter((tag) => tag.startsWith("__ts_symbol=")).map((tag) => tag.slice("__ts_symbol=".length)),
+    maxRiskPct: getValue("__ts_maxRiskPct=").replace("% max", ""),
+    targetR: getValue("__ts_targetR=").replace("R", "")
+  };
+}
+
+function buildConstraintTags({
+  allowedSessions,
+  allowedSymbols,
+  maxRiskPct,
+  targetR
+}: {
+  allowedSessions: string[];
+  allowedSymbols: string;
+  maxRiskPct: string;
+  targetR: string;
+}) {
+  return [
+    targetR.trim() ? `__ts_targetR=${targetR.trim()}R` : null,
+    maxRiskPct.trim() ? `__ts_maxRiskPct=${maxRiskPct.trim()}% max` : null,
+    ...allowedSessions.map((session) => `__ts_session=${session}`),
+    ...allowedSymbols
+      .split(",")
+      .map((symbol) => symbol.trim().toUpperCase())
+      .filter(Boolean)
+      .map((symbol) => `__ts_symbol=${symbol}`)
+  ].filter((tag): tag is string => Boolean(tag));
 }

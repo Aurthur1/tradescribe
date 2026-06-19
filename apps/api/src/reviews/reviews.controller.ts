@@ -67,6 +67,25 @@ interface AdviceLogRow {
   createdAt: Date;
 }
 
+interface SerializedReview {
+  id: string;
+  actions: string[];
+  createdAt: string;
+  leaks: Array<{
+    evidence: Record<string, unknown>;
+    explanation: string;
+    id: string;
+    severity: "critical" | "warning" | "info";
+    tradeIds: string[];
+    type: string;
+  }>;
+  periodEnd: string;
+  periodStart: string;
+  strengths: string[];
+  summary: string;
+  updatedAt: string;
+}
+
 function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   const result = schema.safeParse(value);
   if (!result.success) {
@@ -150,7 +169,12 @@ function recurringForUi(value: unknown) {
   if (Array.isArray(value)) return value;
   return Object.entries(recurringRecord(value))
     .filter(([, count]) => count > 0)
-    .map(([label, count]) => ({ label, count, weeks: 6 }));
+    .map(([label, count]) => ({
+      label,
+      count,
+      weeks: 6,
+      trend: Array.from({ length: 6 }, (_, index) => (index >= 6 - Math.min(6, count) ? 1 : 0))
+    }));
 }
 
 function adviceStatus(status: string): "done" | "not_done" | "unmarked" {
@@ -218,6 +242,26 @@ export class ReviewsController {
     })) as ReviewRow | null;
   }
 
+  private async serializeReviewForUser(userId: string, review: ReviewRow) {
+    const serialized = serializeReview(review);
+    const tradeIds = Array.from(new Set(serialized.leaks.flatMap((leak) => leak.tradeIds)));
+    if (tradeIds.length === 0) return serialized;
+
+    const prisma = await this.prismaService.client();
+    const rows = (await prisma.trade.findMany({
+      where: { id: { in: tradeIds }, tradingAccount: { brokerConnection: { userId } } },
+      select: { id: true }
+    })) as Array<{ id: string }>;
+    const valid = new Set(rows.map((row) => row.id));
+    return {
+      ...serialized,
+      leaks: serialized.leaks.map((leak) => ({
+        ...leak,
+        tradeIds: leak.tradeIds.filter((id) => valid.has(id))
+      }))
+    };
+  }
+
   private async cooldown(userId: string, accountId?: string) {
     const latest = await this.latestReview(userId, accountId);
     if (!latest) return null;
@@ -250,9 +294,35 @@ export class ReviewsController {
 
     return {
       locked: false,
-      review: serializeReview(review),
-      canGenerate: !cooldownUntil,
-      cooldownUntil: cooldownUntil?.toISOString() ?? null
+        review: await this.serializeReviewForUser(user.id, review),
+        canGenerate: !cooldownUntil,
+        cooldownUntil: cooldownUntil?.toISOString() ?? null
+      };
+  }
+
+  @Get("reviews/weekly")
+  async list(@CurrentUser() user: AuthenticatedUser, @Query() query: unknown) {
+    const { accountId } = parse(AccountScopeSchema, query);
+    await this.assertAccountOwnership(user.id, accountId);
+    const entitlement = await this.entitlementFor(user);
+    if (!entitlement.isAdmin && entitlement.plan === "FREE") {
+      return {
+        locked: true,
+        reason: "weekly_review_requires_core",
+        plan: entitlement.plan,
+        reviews: []
+      };
+    }
+
+    const prisma = await this.prismaService.client();
+    const reviews = (await prisma.weeklyReview.findMany({
+      where: { userId: user.id, ...(accountId ? { tradingAccountId: accountId } : {}) },
+      orderBy: { periodStart: "desc" },
+      take: 52
+    })) as ReviewRow[];
+    return {
+      locked: false,
+      reviews: await Promise.all(reviews.map((review) => this.serializeReviewForUser(user.id, review)))
     };
   }
 
@@ -397,7 +467,7 @@ export class ReviewsController {
     await Promise.all(report.coachProfileDelta.adviceGiven.map((text) => prisma.adviceLog.create({ data: { status: "unmarked", text, userId: user.id, weekStart: periodStart } })));
     await recordTokens(this.redis, user.id, llm.tokensUsed);
 
-    return { locked: false, review: serializeReview(review), canGenerate: false, cooldownUntil: new Date(review.createdAt.getTime() + COOLDOWN_MS).toISOString() };
+    return { locked: false, review: await this.serializeReviewForUser(user.id, review), canGenerate: false, cooldownUntil: new Date(review.createdAt.getTime() + COOLDOWN_MS).toISOString() };
   }
 
   @Get("coach/profile")
@@ -485,7 +555,7 @@ export class ReviewsController {
   }
 }
 
-function serializeReview(review: ReviewRow) {
+function serializeReview(review: ReviewRow): SerializedReview {
   const report = WeeklyReviewSchema.safeParse(review.report);
   if (report.success) {
     const legacy = legacyFromReport(report.data);
@@ -504,12 +574,12 @@ function serializeReview(review: ReviewRow) {
 
   return {
     id: review.id,
-    actions: review.actions,
+    actions: Array.isArray(review.actions) ? review.actions.map(String) : [],
     createdAt: review.createdAt.toISOString(),
-    leaks: review.leaks,
+    leaks: Array.isArray(review.leaks) ? (review.leaks as SerializedReview["leaks"]) : [],
     periodEnd: review.periodEnd.toISOString(),
     periodStart: review.periodStart.toISOString(),
-    strengths: review.strengths,
+    strengths: Array.isArray(review.strengths) ? review.strengths.map(String) : [],
     summary: review.summary,
     updatedAt: review.updatedAt.toISOString()
   };

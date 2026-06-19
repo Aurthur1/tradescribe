@@ -7,7 +7,7 @@ import type {
   TradingSession,
   DayOfWeekBreakdown,
 } from './types.js';
-import { netProfit, isWin, resolveRMultiple, toDate } from './util.js';
+import { netProfit, isWin, isLoss, isBreakeven, resolveRMultiple, toDate } from './util.js';
 import { sessionOf } from './sessions.js';
 
 const WEEKDAYS: DayOfWeekBreakdown['weekday'][] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -30,20 +30,25 @@ export function dateKeyInZone(when: string | Date, timeZone: string): string {
  * the requested time zone, sorted ascending, with a running cumulative total.
  */
 export function computeDailySeries(trades: MetricsTrade[], timeZone = 'UTC'): DailyPoint[] {
-  const byDay = new Map<string, { netPnl: number; tradeCount: number }>();
+  const byDay = new Map<string, { breakevenTrades: number; losingTrades: number; netPnl: number; rMultipleSum: number; tradeCount: number; winningTrades: number }>();
   for (const t of trades) {
     const key = dateKeyInZone(t.closeTime, timeZone);
-    const cur = byDay.get(key) ?? { netPnl: 0, tradeCount: 0 };
+    const cur = byDay.get(key) ?? { breakevenTrades: 0, losingTrades: 0, netPnl: 0, rMultipleSum: 0, tradeCount: 0, winningTrades: 0 };
+    const r = resolveRMultiple(t);
     cur.netPnl += netProfit(t);
     cur.tradeCount += 1;
+    cur.winningTrades += isWin(t) ? 1 : 0;
+    cur.losingTrades += isLoss(t) ? 1 : 0;
+    cur.breakevenTrades += isBreakeven(t) ? 1 : 0;
+    cur.rMultipleSum += r ?? 0;
     byDay.set(key, cur);
   }
   const days = [...byDay.keys()].sort();
   let cumulative = 0;
   return days.map((date) => {
-    const { netPnl, tradeCount } = byDay.get(date)!;
+    const { breakevenTrades, losingTrades, netPnl, rMultipleSum, tradeCount, winningTrades } = byDay.get(date)!;
     cumulative += netPnl;
-    return { date, netPnl, tradeCount, cumulativePnl: cumulative };
+    return { breakevenTrades, cumulativePnl: cumulative, date, losingTrades, netPnl, rMultipleSum, tradeCount, winRate: tradeCount ? winningTrades / tradeCount : 0, winningTrades };
   });
 }
 

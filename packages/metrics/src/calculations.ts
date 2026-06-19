@@ -57,6 +57,7 @@ function computeLongestStreaks(trades: MetricsTrade[]) {
  */
 export function computeCoreMetrics(trades: MetricsTrade[]): CoreMetrics {
   const total = trades.length;
+  const totalVolume = sum(trades.map((trade) => trade.volume));
 
   const winners = trades.filter(isWin);
   const losers = trades.filter(isLoss);
@@ -114,6 +115,7 @@ export function computeCoreMetrics(trades: MetricsTrade[]): CoreMetrics {
     grossWin,
     grossLoss,
     totalTrades: total,
+    totalVolume,
     winningTrades: winners.length,
     losingTrades: losers.length,
     breakevenTrades: breakeven.length,

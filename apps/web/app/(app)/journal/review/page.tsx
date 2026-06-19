@@ -5,10 +5,12 @@ import { Suspense, useEffect, useState } from "react";
 import {
   fetchCoachProfile,
   fetchWeeklyReview,
+  fetchWeeklyReviews,
   generateWeeklyReview,
   saveCoachGoals,
   updateAdviceStatus,
   useCurrentUser,
+  useMetrics,
   type CoachProfileResponse,
   type WeeklyReview,
   type WeeklyReviewLeak
@@ -41,6 +43,8 @@ function WeeklyReviewContent() {
     review: null
   });
   const [profile, setProfile] = useState<CoachProfileResponse>(SAMPLE_COACH_PROFILE);
+  const [reviewList, setReviewList] = useState<WeeklyReview[]>([]);
+  const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null);
   const [goals, setGoals] = useState<string[]>(SAMPLE_COACH_PROFILE.profile.goals);
   const [generating, setGenerating] = useState(false);
   const [savingGoals, setSavingGoals] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -64,6 +68,16 @@ function WeeklyReviewContent() {
         setReviewState({ canGenerate: false, cooldownUntil: null, locked: !isAdmin && plan === "FREE", review: null });
       });
 
+    fetchWeeklyReviews(controller.signal, activeAccount?.id ?? null)
+      .then((payload) => {
+        setReviewList(payload.reviews ?? []);
+        setSelectedReviewId((current) => current ?? payload.reviews?.[0]?.id ?? null);
+      })
+      .catch(() => {
+        setReviewList([]);
+        setSelectedReviewId(null);
+      });
+
     fetchCoachProfile(controller.signal)
       .then((payload) => {
         setProfile(payload);
@@ -79,9 +93,13 @@ function WeeklyReviewContent() {
 
   const locked = !isAdmin && (reviewState.locked || plan === "FREE");
   const sampleMode = !hasAccounts || locked;
-  const review = reviewState.review ?? SAMPLE_WEEKLY_REVIEW;
+  const selectedReview = selectedReviewId ? reviewList.find((item) => item.id === selectedReviewId) ?? null : null;
+  const review = selectedReview ?? reviewState.review ?? SAMPLE_WEEKLY_REVIEW;
   const displayProfile = profile.profile ? profile : SAMPLE_COACH_PROFILE;
   const cooldownLabel = reviewState.cooldownUntil ? `Available ${formatDateTime(reviewState.cooldownUntil)}` : "";
+  const reviewIndex = reviewList.findIndex((item) => item.id === review.id);
+  const metricsState = useMetrics(activeAccount?.id ?? null, { anchor: review.periodStart, filters: {}, granularity: "week", tz: currentUser.data?.preferences.timeZone ?? "UTC" });
+  const goalProgress = buildGoalProgress(goals, metricsState.data?.dailySeries ?? []);
 
   async function onGenerate() {
     if (locked || !reviewState.canGenerate) return;
@@ -142,6 +160,39 @@ function WeeklyReviewContent() {
           </div>
         </header>
 
+        <section className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/[0.06] bg-[#141A2A]/70 p-3">
+          <div className="flex items-center gap-2">
+            <button
+              className="rounded-xl border border-white/[0.08] px-3 py-2 text-xs font-bold text-[#CBD5E1] hover:bg-white/[0.04] disabled:opacity-40"
+              disabled={reviewIndex < 0 || reviewIndex >= reviewList.length - 1}
+              onClick={() => setSelectedReviewId(reviewList[reviewIndex + 1]?.id ?? selectedReviewId)}
+              type="button"
+            >
+              Previous week
+            </button>
+            <button
+              className="rounded-xl border border-white/[0.08] px-3 py-2 text-xs font-bold text-[#CBD5E1] hover:bg-white/[0.04] disabled:opacity-40"
+              disabled={reviewIndex <= 0}
+              onClick={() => setSelectedReviewId(reviewList[reviewIndex - 1]?.id ?? selectedReviewId)}
+              type="button"
+            >
+              Next week
+            </button>
+          </div>
+          <div className="flex max-w-full gap-2 overflow-x-auto">
+            {(reviewList.length ? reviewList : [SAMPLE_WEEKLY_REVIEW]).slice(0, 12).map((item) => (
+              <button
+                className={`whitespace-nowrap rounded-xl px-3 py-2 text-xs font-bold ${item.id === review.id ? "bg-[#3B82F6] text-white" : "bg-white/[0.04] text-[#94A3B8] hover:text-white"}`}
+                key={item.id}
+                onClick={() => setSelectedReviewId(item.id)}
+                type="button"
+              >
+                {shortPeriodLabel(item.periodStart)}
+              </button>
+            ))}
+          </div>
+        </section>
+
         {locked ? <LockedBanner /> : null}
         {!locked && !reviewState.review ? <EmptyBanner /> : null}
 
@@ -166,6 +217,7 @@ function WeeklyReviewContent() {
               }));
             }}
             onGoal={(index, value) => setGoals((current) => current.map((goal, goalIndex) => (goalIndex === index ? value : goal)))}
+            goalProgress={goalProgress}
             onSaveGoals={onSaveGoals}
             profile={displayProfile.profile}
             saving={savingGoals}
@@ -271,6 +323,7 @@ function NextActions({ actions }: { actions: string[] }) {
 function CoachProfilePanel({
   advice,
   disabled,
+  goalProgress,
   goals,
   onAdvice,
   onGoal,
@@ -280,6 +333,7 @@ function CoachProfilePanel({
 }: {
   advice: CoachProfileResponse["advice"];
   disabled: boolean;
+  goalProgress: Array<{ goal: string; label: string; tone: "neutral" | "warning" }>;
   goals: string[];
   onAdvice: (id: string, status: "pending" | "did_this" | "didnt_do_this") => void;
   onGoal: (index: number, value: string) => void;
@@ -293,9 +347,12 @@ function CoachProfilePanel({
         <h2 className="text-lg font-bold text-white">Coach Profile</h2>
         <div className="mt-4 space-y-3">
           {profile.recurringLeaks.map((item) => (
-            <p className="rounded-xl bg-white/[0.03] p-3 text-sm font-semibold text-[#CBD5E1]" key={item.label}>
-              {item.label}: flagged {item.count} of the last {item.weeks} weeks
-            </p>
+            <div className="rounded-xl bg-white/[0.03] p-3" key={item.label}>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-[#CBD5E1]">{item.label}: {item.count} of last {item.weeks} weeks</p>
+                <LeakTrend values={item.trend ?? trendFromCount(item.count, item.weeks)} />
+              </div>
+            </div>
           ))}
         </div>
         <p className="mt-4 text-sm leading-6 text-[#94A3B8]">{profile.riskProfileSummary}</p>
@@ -311,7 +368,10 @@ function CoachProfilePanel({
         </div>
         <div className="mt-4 space-y-2">
           {goals.map((goal, index) => (
-            <input className="h-10 w-full rounded-xl border border-white/[0.08] bg-[#0A0E1A] px-3 text-sm font-semibold text-white outline-none focus:ring-2 focus:ring-[#3B82F6] disabled:opacity-50" disabled={disabled} key={index} onChange={(event) => onGoal(index, event.target.value)} value={goal} />
+            <div key={index}>
+              <input className="h-10 w-full rounded-xl border border-white/[0.08] bg-[#0A0E1A] px-3 text-sm font-semibold text-white outline-none focus:ring-2 focus:ring-[#3B82F6] disabled:opacity-50" disabled={disabled} onChange={(event) => onGoal(index, event.target.value)} value={goal} />
+              {goalProgress[index] ? <p className={`mt-1 text-[11px] font-bold ${goalProgress[index].tone === "warning" ? "text-[#FCD34D]" : "text-[#94A3B8]"}`}>{goalProgress[index].label}</p> : null}
+            </div>
           ))}
         </div>
       </section>
@@ -328,10 +388,10 @@ function CoachProfilePanel({
                 <p className="text-sm leading-6 text-[#CBD5E1]">{item.text}</p>
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <button className={`rounded-lg px-2 py-1.5 text-xs font-bold ${item.status === "did_this" ? "bg-[#22C55E]/15 text-[#86EFAC]" : "bg-white/[0.04] text-[#94A3B8]"}`} disabled={disabled} onClick={() => onAdvice(item.id, "did_this")} type="button">
-                    Did this
+                    Done
                   </button>
                   <button className={`rounded-lg px-2 py-1.5 text-xs font-bold ${item.status === "didnt_do_this" ? "bg-[#EF4444]/15 text-[#FCA5A5]" : "bg-white/[0.04] text-[#94A3B8]"}`} disabled={disabled} onClick={() => onAdvice(item.id, "didnt_do_this")} type="button">
-                    Didn&apos;t do this
+                    Not done
                   </button>
                 </div>
               </div>
@@ -341,6 +401,38 @@ function CoachProfilePanel({
       </section>
     </aside>
   );
+}
+
+function LeakTrend({ values }: { values: number[] }) {
+  return (
+    <div className="flex items-end gap-1" aria-label="Recurring leak trend">
+      {values.slice(-6).map((value, index) => (
+        <span className={`block w-1.5 rounded-full ${value > 0 ? "bg-[#3B82F6]" : "bg-white/[0.12]"}`} key={`${value}-${index}`} style={{ height: `${8 + Math.min(3, value) * 4}px` }} />
+      ))}
+    </div>
+  );
+}
+
+function trendFromCount(count: number, weeks: number) {
+  return Array.from({ length: weeks }, (_, index) => (index >= weeks - count ? 1 : 0));
+}
+
+function buildGoalProgress(goals: string[], dailySeries: Array<{ date: string; tradeCount: number }>) {
+  return goals.map((goal) => {
+    const match = goal.match(/max\s+(\d+)\s+trades?\/day/i);
+    if (!match) return { goal, label: "Progress tracking will appear when this goal maps to deterministic metrics.", tone: "neutral" as const };
+    const limit = Number(match[1]);
+    const breached = dailySeries.filter((day) => day.tradeCount > limit);
+    return {
+      goal,
+      label: breached.length ? `${breached.length} day${breached.length === 1 ? "" : "s"} breached this week` : "No days breached this week",
+      tone: breached.length ? ("warning" as const) : ("neutral" as const)
+    };
+  });
+}
+
+function shortPeriodLabel(start: string) {
+  return new Intl.DateTimeFormat("en-US", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(start));
 }
 
 function periodLabel(start: string, end: string) {

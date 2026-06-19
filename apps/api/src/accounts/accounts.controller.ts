@@ -1,5 +1,6 @@
 import { BadRequestException, Body, Controller, Delete, Get, Module, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
-import { metaApiGateway, MetaApiConnectionError, provisionReadOnlyAccount } from "@tradescribe/metaapi";
+import { adapterCatalog, capabilitiesFor, MetaApiAdapter, previewCsvImport, parseDelimited, normalizeCsvRecords, type CsvColumnMapping } from "@tradescribe/brokers";
+import { MetaApiConnectionError } from "@tradescribe/metaapi";
 import { computeMetrics } from "@tradescribe/metrics";
 import { z, ZodError, type ZodTypeAny } from "zod";
 import { AuthGuard } from "../auth/auth.guard.js";
@@ -13,8 +14,41 @@ import { PrismaService } from "../prisma/prisma.service.js";
 import { RedisService } from "../redis/redis.service.js";
 import { SignalsService } from "../signals/signals.service.js";
 
+const DashboardFilterSchema = z.object({
+  day: z.string().optional(),
+  emotionTag: z.string().optional(),
+  playbookId: z.string().optional(),
+  session: z.enum(["Sydney", "Tokyo", "London", "New York"]).optional(),
+  side: z.enum(["BUY", "SELL"]).optional(),
+  symbol: z.string().optional()
+});
+
+const DashboardLayoutItemSchema = z.object({
+  order: z.number().int(),
+  size: z.enum(["sm", "md", "lg"]),
+  visible: z.boolean(),
+  widgetId: z.string()
+});
+
+const SavedDashboardViewSchema = z.object({
+  anchor: z.string(),
+  filters: DashboardFilterSchema,
+  granularity: z.enum(["day", "week", "month", "year"]),
+  id: z.string(),
+  layout: z.array(DashboardLayoutItemSchema).max(24),
+  name: z.string().trim().min(1).max(48)
+});
+
 const PreferencesSchema = z.object({
-  activeAccountId: z.string().nullable()
+  activeAccountId: z.string().nullable().optional(),
+  dashboardViews: z.array(SavedDashboardViewSchema).max(12).optional(),
+  tradeExplorerPrefs: z
+    .object({
+      columnOrder: z.array(z.string()).max(32),
+      hiddenColumns: z.array(z.string()).max(32),
+      viewMode: z.enum(["table", "cards"])
+    })
+    .optional()
 });
 
 const ProfileSchema = z.object({
@@ -62,6 +96,20 @@ const ConnectAccountSchema = z.object({
   startingBalance: z.coerce.number().min(0).default(0)
 });
 
+const CsvMappingSchema = z.record(z.string(), z.string());
+
+const CsvPreviewSchema = z.object({
+  content: z.string().min(1),
+  currency: z.string().trim().min(3).max(8).default("USD"),
+  mapping: CsvMappingSchema.optional()
+});
+
+const CsvCommitSchema = CsvPreviewSchema.extend({
+  broker: z.string().trim().min(1).max(80).default("CSV Import"),
+  label: z.string().trim().min(1).max(80).default("CSV Import"),
+  startingBalance: z.coerce.number().min(0).default(0)
+});
+
 function parseInput<T>(schema: ZodTypeAny, value: unknown): T {
   try {
     return schema.parse(value);
@@ -93,6 +141,7 @@ interface BrokerConnectionRow {
   broker: string | null;
   id: string;
   lastError?: string | null;
+  platform?: string | null;
   provider: string;
   server?: string | null;
   status: string;
@@ -124,6 +173,8 @@ interface UserWithAccounts {
     onboardingCompletedAt: Date | null;
     onboardingSampleModeAt: Date | null;
     timeZone: string | null;
+    dashboardViews: unknown;
+    tradeExplorerPrefs: unknown;
   } | null;
   brokerConnections: BrokerConnectionRow[];
   subscriptions: SubscriptionRow[];
@@ -169,6 +220,8 @@ function errorStatus(error: unknown): "DEGRADED" | "DISCONNECTED" {
 @Controller()
 @UseGuards(AuthGuard)
 export class AccountsController {
+  private readonly metaApiAdapter = new MetaApiAdapter();
+
   constructor(
     private readonly prismaService: PrismaService,
     private readonly auditLog: AuditLogService,
@@ -232,6 +285,11 @@ export class AccountsController {
     return prisma.tradingAccount.count({ where: { brokerConnection: { userId } } }) as Promise<number>;
   }
 
+  @Get("broker-adapters")
+  brokerAdapters() {
+    return { adapters: adapterCatalog() };
+  }
+
   @Get("me")
   async me(@CurrentUser() currentUser: AuthenticatedUser) {
     const user = await this.userRow(currentUser);
@@ -275,6 +333,8 @@ export class AccountsController {
         notificationPreferences: user?.preferences?.notificationPreferences ?? defaultNotificationPreferences,
         onboardingCompletedAt: user?.preferences?.onboardingCompletedAt?.toISOString() ?? null,
         onboardingSampleModeAt: user?.preferences?.onboardingSampleModeAt?.toISOString() ?? null,
+        dashboardViews: user?.preferences?.dashboardViews ?? [],
+        tradeExplorerPrefs: user?.preferences?.tradeExplorerPrefs ?? null,
         timeZone: user?.preferences?.timeZone ?? null
       },
       subscription: latestSubscription
@@ -325,21 +385,28 @@ export class AccountsController {
 
   @Patch("me/preferences")
   async updatePreferences(@CurrentUser() currentUser: AuthenticatedUser, @Body() body: unknown) {
-    const input = parseInput<{ activeAccountId: string | null }>(PreferencesSchema, body);
+    const input = parseInput<{ activeAccountId?: string | null; dashboardViews?: unknown[]; tradeExplorerPrefs?: unknown }>(PreferencesSchema, body);
     const user = await this.userRow(currentUser);
     const plan = user?.plan ?? currentUser.plan;
     const role = user?.role ?? currentUser.role;
 
-    if (input.activeAccountId) {
-      await this.assertAccountOwnership(currentUser.id, input.activeAccountId);
-    } else if (plan !== "PRO" && role !== "ADMIN") {
-      throw new BadRequestException("All accounts view requires Pro");
+    if ("activeAccountId" in input) {
+      if (input.activeAccountId) {
+        await this.assertAccountOwnership(currentUser.id, input.activeAccountId);
+      } else if (plan !== "PRO" && role !== "ADMIN") {
+        throw new BadRequestException("All accounts view requires Pro");
+      }
     }
+
+    const data: { activeAccountId?: string | null; dashboardViews?: unknown[]; tradeExplorerPrefs?: unknown } = {};
+    if ("activeAccountId" in input) data.activeAccountId = input.activeAccountId ?? null;
+    if (input.dashboardViews) data.dashboardViews = input.dashboardViews;
+    if (input.tradeExplorerPrefs) data.tradeExplorerPrefs = input.tradeExplorerPrefs;
 
     const prisma = await this.prisma();
     return prisma.userPreference.upsert({
-      create: { activeAccountId: input.activeAccountId, userId: currentUser.id },
-      update: { activeAccountId: input.activeAccountId },
+      create: { userId: currentUser.id, ...data },
+      update: data,
       where: { userId: currentUser.id }
     });
   }
@@ -551,6 +618,7 @@ export class AccountsController {
     const connectionRows =
       user?.brokerConnections.map((connection) => ({
         broker: connection.broker ?? connection.provider,
+        capabilities: capabilitiesFor(connection.provider, connection.platform),
         id: connection.id,
         lastError: connection.lastError ?? null,
         provider: connection.provider,
@@ -566,6 +634,7 @@ export class AccountsController {
           login: account.login,
           maskedLogin: maskLogin(account.login),
           platform: account.platform,
+          capabilities: capabilitiesFor(connection.provider, account.platform),
           currency: account.currency,
           isPrimary: account.isPrimary,
           balance: account.startingBalance,
@@ -626,8 +695,9 @@ export class AccountsController {
 
     try {
       await prisma.brokerConnection.update({ where: { id: connection.id }, data: { status: "PROVISIONING" } });
-      const provisioned = await provisionReadOnlyAccount(input);
-      const accountInfo = await metaApiGateway.getAccountInformation(provisioned.metaApiAccountId);
+      const provisioned = await this.metaApiAdapter.connect(input);
+      if (!provisioned.externalAccountId) throw new MetaApiConnectionError("MetaApi did not return an account id", "degraded");
+      const accountInfo = await this.metaApiAdapter.getAccountInfo(provisioned.externalAccountId);
       const account = (await prisma.tradingAccount.create({
         data: {
           brokerConnectionId: connection.id,
@@ -645,7 +715,7 @@ export class AccountsController {
         where: { id: connection.id },
         data: {
           lastError: null,
-          metaApiAccountId: provisioned.metaApiAccountId,
+          metaApiAccountId: provisioned.externalAccountId,
           status: "SYNCING"
         }
       });
@@ -675,6 +745,163 @@ export class AccountsController {
       });
       return { accountId: null, id: connection.id, lastError, status };
     }
+  }
+
+  @Post("imports/csv/preview")
+  async previewCsv(@Body() body: unknown) {
+    const input = parseInput<z.infer<typeof CsvPreviewSchema>>(CsvPreviewSchema, body);
+    return previewCsvImport(input.content, input.mapping as CsvColumnMapping | undefined, { accountCurrency: input.currency });
+  }
+
+  @Post("imports/csv/commit")
+  async commitCsv(@CurrentUser() currentUser: AuthenticatedUser, @Body() body: unknown) {
+    const input = parseInput<z.infer<typeof CsvCommitSchema>>(CsvCommitSchema, body);
+    const parsed = parseDelimited(input.content);
+    const preview = previewCsvImport(input.content, input.mapping as CsvColumnMapping | undefined, { accountCurrency: input.currency });
+    const normalized = normalizeCsvRecords(parsed.records, preview.mapping, { accountCurrency: input.currency });
+    if (normalized.trades.length === 0) throw new BadRequestException("No valid trades found in CSV");
+
+    const prisma = await this.prisma();
+    const existingAccount = (await prisma.tradingAccount.findFirst({
+      where: {
+        label: input.label,
+        brokerConnection: { broker: input.broker, provider: "csv", userId: currentUser.id }
+      },
+      include: { brokerConnection: true }
+    })) as { brokerConnectionId: string; id: string } | null;
+
+    let tradingAccountId = existingAccount?.id;
+    let connectionId = existingAccount?.brokerConnectionId;
+
+    if (!tradingAccountId) {
+      const user = await this.userRow(currentUser);
+      const limit = this.planLimit(user?.plan ?? currentUser.plan);
+      const currentCount = await this.accountCount(currentUser.id);
+      if (currentCount >= limit) throw new BadRequestException("Account limit reached for your plan");
+
+      const connection = (await prisma.brokerConnection.create({
+        data: {
+          broker: input.broker,
+          lastError: null,
+          login: input.label,
+          platform: "CSV",
+          provider: "csv",
+          server: "csv-import",
+          status: "CONNECTED",
+          userId: currentUser.id,
+          tradingAccounts: {
+            create: {
+              currency: input.currency.toUpperCase(),
+              isPrimary: currentCount === 0,
+              label: input.label,
+              login: `csv:${input.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+              name: input.label,
+              platform: "CSV",
+              startingBalance: input.startingBalance
+            }
+          }
+        },
+        include: { tradingAccounts: true }
+      })) as { id: string; tradingAccounts: Array<{ id: string }> };
+      tradingAccountId = connection.tradingAccounts[0]?.id;
+      connectionId = connection.id;
+      if (!tradingAccountId) throw new BadRequestException("Could not create CSV import account");
+      await prisma.equitySnapshot.create({
+        data: {
+          balance: input.startingBalance,
+          equity: input.startingBalance,
+          tradingAccountId,
+          ts: new Date()
+        }
+      });
+    }
+
+    const externalIds = normalized.trades.map((trade) => trade.externalId);
+    const existingTrades = (await prisma.trade.findMany({
+      where: { externalId: { in: externalIds }, tradingAccountId },
+      select: { externalId: true }
+    })) as Array<{ externalId: string }>;
+    const existingIds = new Set(existingTrades.map((trade) => trade.externalId));
+
+    let created = 0;
+    let updated = 0;
+    for (const trade of normalized.trades) {
+      const existed = existingIds.has(trade.externalId);
+      await prisma.trade.upsert({
+        where: { tradingAccountId_externalId: { externalId: trade.externalId, tradingAccountId } },
+        create: {
+          brokerTimeZone: trade.brokerTimeZone,
+          closePrice: trade.closePrice,
+          closeTime: trade.closeTime,
+          commission: trade.commission,
+          durationSec: trade.durationSec,
+          externalId: trade.externalId,
+          grossProfit: trade.grossProfit,
+          openPrice: trade.openPrice,
+          openTime: trade.openTime,
+          rMultiple: trade.rMultiple,
+          riskAmount: trade.riskAmount,
+          session: trade.session,
+          side: trade.side,
+          stopLoss: trade.stopLoss,
+          swap: trade.swap,
+          symbol: trade.symbol,
+          takeProfit: trade.takeProfit,
+          tradingAccountId,
+          volume: trade.volume
+        },
+        update: {
+          brokerTimeZone: trade.brokerTimeZone,
+          closePrice: trade.closePrice,
+          closeTime: trade.closeTime,
+          commission: trade.commission,
+          durationSec: trade.durationSec,
+          grossProfit: trade.grossProfit,
+          openPrice: trade.openPrice,
+          openTime: trade.openTime,
+          rMultiple: trade.rMultiple,
+          riskAmount: trade.riskAmount,
+          session: trade.session,
+          side: trade.side,
+          stopLoss: trade.stopLoss,
+          swap: trade.swap,
+          symbol: trade.symbol,
+          takeProfit: trade.takeProfit,
+          volume: trade.volume
+        }
+      });
+      if (existed) updated += 1;
+      else created += 1;
+    }
+
+    if (connectionId) {
+      await prisma.brokerConnection.update({ where: { id: connectionId }, data: { lastError: null, lastSyncAt: new Date(), status: "CONNECTED" } });
+    }
+
+    await prisma.userPreference.upsert({
+      create: { activeAccountId: tradingAccountId, userId: currentUser.id },
+      update: { activeAccountId: tradingAccountId },
+      where: { userId: currentUser.id }
+    });
+
+    await this.auditLog.record({
+      action: "connection.csv_import",
+      actorUserId: currentUser.id,
+      metadata: { broker: input.broker, created, label: input.label, rows: normalized.trades.length, updated },
+      targetId: connectionId,
+      targetType: "BrokerConnection",
+      targetUserId: currentUser.id
+    });
+
+    return {
+      accountId: tradingAccountId,
+      connectionId,
+      created,
+      errors: normalized.errors.slice(0, 25),
+      skipped: normalized.skipped,
+      totalRows: parsed.records.length,
+      updated
+    };
   }
 
   @Get("connections/:id")
@@ -722,7 +949,7 @@ export class AccountsController {
       targetUserId: userId
     });
     if (connection.metaApiAccountId) {
-      await metaApiGateway.removeAccount(connection.metaApiAccountId).catch(() => undefined);
+      await this.metaApiAdapter.disconnect(connection.metaApiAccountId).catch(() => undefined);
     }
     if (input.deleteTradeHistory) {
       return prisma.brokerConnection.delete({ where: { id: connectionId } });

@@ -74,6 +74,7 @@ describe("core metrics", () => {
 
   it("counts and P&L", () => {
     assert.equal(metrics.totalTrades, 4);
+    assert.equal(metrics.totalVolume, 4);
     assert.equal(metrics.winningTrades, 2);
     assert.equal(metrics.losingTrades, 2);
     assert.equal(metrics.netPnl, 200);
@@ -113,6 +114,7 @@ describe("edge cases", () => {
   it("handles an empty set", () => {
     const metrics = computeCoreMetrics([]);
     assert.equal(metrics.totalTrades, 0);
+    assert.equal(metrics.totalVolume, 0);
     assert.equal(metrics.netPnl, 0);
     assert.equal(metrics.winRate, 0);
     assert.equal(metrics.profitFactor, null);
@@ -216,8 +218,8 @@ describe("session classification", () => {
 describe("daily series and time zones", () => {
   it("buckets by close date with cumulative totals", () => {
     assert.deepEqual(computeDailySeries(mixed, "UTC"), [
-      { date: "2025-04-07", netPnl: 50, tradeCount: 2, cumulativePnl: 50 },
-      { date: "2025-04-08", netPnl: 150, tradeCount: 2, cumulativePnl: 200 }
+      { breakevenTrades: 0, date: "2025-04-07", losingTrades: 1, netPnl: 50, rMultipleSum: 1, tradeCount: 2, winRate: 0.5, winningTrades: 1, cumulativePnl: 50 },
+      { breakevenTrades: 0, date: "2025-04-08", losingTrades: 1, netPnl: 150, rMultipleSum: 1, tradeCount: 2, winRate: 0.5, winningTrades: 1, cumulativePnl: 200 }
     ]);
   });
 

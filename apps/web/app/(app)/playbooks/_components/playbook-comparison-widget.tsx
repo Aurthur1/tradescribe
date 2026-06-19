@@ -18,6 +18,7 @@ export function PlaybookComparisonWidget({
       color: playbook.color,
       id: playbook.id,
       name: playbook.name,
+      expectancyR: playbook.metrics.expectancyR,
       netPnl: playbook.metrics.netPnl,
       totalTrades: playbook.metrics.totalTrades,
       winRate: playbook.metrics.winRate
@@ -26,6 +27,7 @@ export function PlaybookComparisonWidget({
       color: "#64748B",
       id: "untagged",
       name: "Untagged",
+      expectancyR: data.untagged.metrics.expectancyR,
       netPnl: data.untagged.metrics.netPnl,
       totalTrades: data.untagged.metrics.totalTrades,
       winRate: data.untagged.metrics.winRate
@@ -66,7 +68,8 @@ export function PlaybookComparisonWidget({
             </div>
             <div className="mt-2 flex items-center justify-between text-xs font-semibold text-[#94A3B8]">
               <span>{row.totalTrades} trades</span>
-              <span>{Math.round(row.winRate * 100)}% win rate</span>
+              <span>{Math.round(row.winRate * 100)}% WR</span>
+              <span>{row.expectancyR == null ? "—" : `${row.expectancyR.toFixed(2)}R`} exp</span>
             </div>
           </div>
         ))}

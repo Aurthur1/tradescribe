@@ -50,6 +50,9 @@ importers:
       '@sentry/node':
         specifier: ^8.47.0
         version: 8.55.2
+      '@tradescribe/brokers':
+        specifier: workspace:*
+        version: link:../../packages/brokers
       '@tradescribe/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -179,6 +182,19 @@ importers:
         version: 5.9.3
 
   packages/billing:
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
+  packages/brokers:
+    dependencies:
+      '@tradescribe/metaapi':
+        specifier: workspace:*
+        version: link:../metaapi
+      '@tradescribe/metrics':
+        specifier: workspace:*
+        version: link:../metrics
     devDependencies:
       typescript:
         specifier: ^5.7.2

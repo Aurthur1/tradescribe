@@ -62,6 +62,21 @@ function serializeTrade(row: TradeRow & { playbook?: { color: string; id: string
   };
 }
 
+function rulesFrom(value: unknown) {
+  return Array.isArray(value) ? value.filter((rule) => typeof rule === "object" && rule !== null) : [];
+}
+
+function checklistFrom(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (item): item is { checked: boolean; ruleIndex: number } =>
+      typeof item === "object" &&
+      item !== null &&
+      typeof (item as { checked?: unknown }).checked === "boolean" &&
+      Number.isInteger((item as { ruleIndex?: unknown }).ruleIndex)
+  );
+}
+
 @Controller()
 @UseGuards(AuthGuard)
 export class PlaybooksController {
@@ -136,7 +151,78 @@ export class PlaybooksController {
       timeZone: query.tz
     });
 
-    return { current, metrics };
+    return { current, currentRows, metrics, startingBalance };
+  }
+
+  private async computeRuleAdherence(userId: string, playbook: { id: string; rules: unknown }, currentRows: TradeRow[], startingBalance: number, timeZone?: string) {
+    const ruleCount = rulesFrom(playbook.rules).length;
+    const emptyMetrics = computeMetrics({ trades: [], equitySnapshots: [], startingBalance, timeZone });
+    if (ruleCount === 0 || currentRows.length === 0) {
+      return {
+        adherencePct: null,
+        brokenMetrics: emptyMetrics,
+        brokenTrades: 0,
+        configuredRules: ruleCount,
+        delta: { expectancyR: null, netPnl: 0 },
+        followedMetrics: emptyMetrics,
+        followedTrades: 0,
+        reviewedTrades: 0
+      };
+    }
+
+    const prisma = await this.prisma();
+    const tradeIds = currentRows.map((trade) => trade.id);
+    const notes = (await prisma.tradeNote.findMany({
+      where: { tradeId: { in: tradeIds }, trade: { tradingAccount: { brokerConnection: { userId } } } },
+      orderBy: { updatedAt: "desc" },
+      select: { playbookChecklist: true, tradeId: true }
+    })) as Array<{ playbookChecklist: unknown; tradeId: string }>;
+    const latestChecklistByTradeId = new Map<string, Array<{ checked: boolean; ruleIndex: number }>>();
+    for (const note of notes) {
+      if (!latestChecklistByTradeId.has(note.tradeId)) latestChecklistByTradeId.set(note.tradeId, checklistFrom(note.playbookChecklist));
+    }
+
+    const followedRows: TradeRow[] = [];
+    const brokenRows: TradeRow[] = [];
+    for (const row of currentRows) {
+      const checklist = latestChecklistByTradeId.get(row.id);
+      if (!checklist || checklist.length === 0) continue;
+      const checkedRules = new Set(checklist.filter((item) => item.checked).map((item) => item.ruleIndex));
+      const followed = Array.from({ length: ruleCount }, (_, index) => index).every((index) => checkedRules.has(index));
+      if (followed) followedRows.push(row);
+      else brokenRows.push(row);
+    }
+
+    const followedMetrics = computeMetrics({
+      trades: followedRows.map(toMetricsTrade),
+      equitySnapshots: [],
+      startingBalance,
+      timeZone
+    });
+    const brokenMetrics = computeMetrics({
+      trades: brokenRows.map(toMetricsTrade),
+      equitySnapshots: [],
+      startingBalance,
+      timeZone
+    });
+    const reviewedTrades = followedRows.length + brokenRows.length;
+
+    return {
+      adherencePct: reviewedTrades ? followedRows.length / reviewedTrades : null,
+      brokenMetrics,
+      brokenTrades: brokenRows.length,
+      configuredRules: ruleCount,
+      delta: {
+        expectancyR:
+          followedMetrics.expectancyR === null || brokenMetrics.expectancyR === null
+            ? null
+            : followedMetrics.expectancyR - brokenMetrics.expectancyR,
+        netPnl: followedMetrics.netPnl - brokenMetrics.netPnl
+      },
+      followedMetrics,
+      followedTrades: followedRows.length,
+      reviewedTrades
+    };
   }
 
   @Get("playbooks/performance-summary")
@@ -240,7 +326,8 @@ export class PlaybooksController {
   async performance(@CurrentUser("id") userId: string, @Param("id") playbookId: string, @Query() query: unknown) {
     const playbook = await this.assertPlaybook(userId, playbookId);
     const parsed = parseInput<PlaybookMetricsQuery>(PlaybookMetricsQuerySchema, query);
-    const { current, metrics } = await this.computeForPlaybook(userId, playbook.id, parsed);
+    const { current, currentRows, metrics, startingBalance } = await this.computeForPlaybook(userId, playbook.id, parsed);
+    const ruleAdherence = await this.computeRuleAdherence(userId, playbook, currentRows, startingBalance, parsed.tz);
     const prisma = await this.prisma();
     const recentTrades = (await prisma.trade.findMany({
       where: {
@@ -257,7 +344,8 @@ export class PlaybooksController {
       metrics: metrics as MetricsResult,
       period: { label: current.label, granularity: parsed.granularity },
       playbook,
-      recentTrades: recentTrades.map((trade) => serializeTrade(trade))
+      recentTrades: recentTrades.map((trade) => serializeTrade(trade)),
+      ruleAdherence
     };
   }
 
